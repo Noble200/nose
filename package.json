@@ -1,0 +1,82 @@
+{
+  "name": "agro-gestion-app",
+  "version": "1.0.0",
+  "description": "Aplicación de gestión agrícola con manejo centralizado de stock",
+  "author": "Tu Nombre",
+  "private": true,
+  "main": "electron/main.js",
+  "homepage": "./",
+  "scripts": {
+    "react-start": "react-scripts start",
+    "react-build": "react-scripts build",
+    "react-test": "react-scripts test",
+    "react-eject": "react-scripts eject",
+    "electron-build": "electron-builder",
+    "build": "npm run react-build && npm run electron-build",
+    "start": "concurrently \"cross-env BROWSER=none npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
+    "pack": "electron-builder --dir",
+    "dist": "npm run react-build && electron-builder",
+    "create-admin": "node scripts/createAdmin.js"
+  },
+  "build": {
+    "appId": "com.tuempresa.agrogestion",
+    "productName": "AgroGestión",
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "public/assets"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/assets/icons/icon.ico"
+    }
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      "last 1 electron version",
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 electron version",
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "dependencies": {
+    "dayjs": "^1.11.13",
+    "electron-log": "^5.4.0",
+    "firebase": "^11.7.3",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
+    "prompt-sync": "^4.2.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-error-boundary": "^6.0.0",
+    "react-router-dom": "^7.6.0",
+    "react-scripts": "^5.0.1",
+    "uuid": "^11.1.0",
+    "web-vitals": "^5.0.1"
+  },
+  "devDependencies": {
+    "@electron/remote": "^2.1.2",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^36.2.1",
+    "electron-is-dev": "^3.0.1",
+    "wait-on": "^8.0.3"
+  }
+}

@@ -1,0 +1,29 @@
+/* index.css - Importación de todos los estilos de la aplicación */
+
+/* Importar el archivo de variables CSS primero */
+@import './styles/variables.css';
+
+/* Estilos globales */
+@import './styles/global.css';
+
+/* Componentes UI comunes */
+@import './styles/buttons.css';
+@import './styles/forms.css';
+@import './styles/alerts.css';
+@import './styles/tables.css';
+@import './styles/select-fix.css';
+
+/* Componentes de layout */
+@import './components/layout/AppLayout/appLayout.css';
+@import './components/layout/Sidebar/sidebar.css';
+@import './components/layout/Header/header.css';
+
+/* Páginas */
+@import './pages/Login/login.css';
+@import './components/panels/Dashboard/dashboard.css';
+@import './components/panels/Harvests/harvests.css';
+@import './components/panels/Fields/fields.css';
+@import './components/panels/Products/products.css';
+
+/* Importar Font Awesome para iconos (CDN) */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
