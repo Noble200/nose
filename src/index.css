@@ -24,6 +24,8 @@
 @import './components/panels/Harvests/harvests.css';
 @import './components/panels/Fields/fields.css';
 @import './components/panels/Products/products.css';
+@import './components/panels/Warehouses/warehouses.css';
+@import './components/panels/Fumigations/fumigations.css';
 
 /* Importar Font Awesome para iconos (CDN) */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
