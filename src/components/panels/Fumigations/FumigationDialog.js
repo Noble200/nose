@@ -1,4 +1,4 @@
-// src/components/panels/Fumigations/FumigationDialog.js
+// src/components/panels/Fumigations/FumigationDialog.js - Mejorado con cc/ha
 import React, { useState, useEffect } from 'react';
 
 const FumigationDialog = ({ 
@@ -45,6 +45,31 @@ const FumigationDialog = ({
   const [doseUnit, setDoseUnit] = useState('L/ha');
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+
+  // NUEVO: Función para convertir unidades a litros
+  const convertToLiters = (value, unit) => {
+    switch (unit) {
+      case 'cc/ha':
+      case 'ml/ha':
+        return value / 1000; // 1000 cc = 1 L
+      case 'L/ha':
+        return value;
+      case 'g/ha':
+      case 'kg/ha':
+        // Para sólidos, asumimos densidad aproximada de 1 (puede ajustarse)
+        return unit === 'kg/ha' ? value : value / 1000;
+      default:
+        return value;
+    }
+  };
+
+  // NUEVO: Función para mostrar la conversión
+  const showConversion = (value, fromUnit, toUnit = 'L') => {
+    if (fromUnit === 'L/ha') return null;
+    
+    const converted = convertToLiters(value, fromUnit);
+    return `≈ ${converted.toFixed(3)} L/ha`;
+  };
 
   // Cargar datos de la fumigación si estamos editando
   useEffect(() => {
@@ -214,7 +239,7 @@ const FumigationDialog = ({
     }));
   };
 
-  // Añadir producto seleccionado
+  // MEJORADO: Añadir producto seleccionado con conversión de unidades
   const handleAddProduct = () => {
     if (!selectedProductId || !dosePerHa || isNaN(Number(dosePerHa)) || Number(dosePerHa) <= 0) {
       return;
@@ -223,14 +248,24 @@ const FumigationDialog = ({
     const product = products.find(p => p.id === selectedProductId);
     if (!product) return;
     
-    // Calcular cantidad total necesaria
-    const totalQuantity = (Number(dosePerHa) * Number(formData.totalSurface || 0));
+    // MEJORADO: Calcular cantidad total con conversión a litros
+    const doseInLiters = convertToLiters(Number(dosePerHa), doseUnit);
+    const totalQuantity = doseInLiters * Number(formData.totalSurface || 0);
     
-    // Verificar que hay suficiente stock
-    if (totalQuantity > product.stock) {
+    // MEJORADO: Verificar stock considerando la unidad del producto
+    let stockToCheck = totalQuantity;
+    
+    // Si el producto se almacena en cc/ml y calculamos en litros, convertir
+    if (product.unit === 'ml' || product.unit === 'cc') {
+      stockToCheck = totalQuantity * 1000; // L a ml
+    } else if (product.unit === 'L') {
+      stockToCheck = totalQuantity; // Ya en litros
+    }
+    
+    if (stockToCheck > product.stock) {
       setErrors(prev => ({
         ...prev,
-        productQuantity: `No hay suficiente stock. Disponible: ${product.stock} ${product.unit}, necesario: ${totalQuantity.toFixed(2)} ${product.unit}`
+        productQuantity: `No hay suficiente stock. Disponible: ${product.stock} ${product.unit}, necesario: ${stockToCheck.toFixed(2)} ${product.unit}`
       }));
       return;
     }
@@ -238,16 +273,21 @@ const FumigationDialog = ({
     // Verificar si el producto ya está añadido
     const existingIndex = formData.selectedProducts.findIndex(p => p.productId === selectedProductId);
     
+    const productData = {
+      productId: selectedProductId,
+      dosePerHa: Number(dosePerHa),
+      doseUnit: doseUnit,
+      doseInLiters: doseInLiters, // NUEVO: Almacenar conversión
+      totalQuantity: stockToCheck, // Cantidad en la unidad del producto
+      totalQuantityLiters: totalQuantity, // NUEVO: Cantidad en litros para cálculos
+      unit: product.unit,
+      conversion: showConversion(Number(dosePerHa), doseUnit) // NUEVO: Mostrar conversión
+    };
+    
     if (existingIndex >= 0) {
       // Actualizar si ya existe
       const updatedProducts = [...formData.selectedProducts];
-      updatedProducts[existingIndex] = {
-        ...updatedProducts[existingIndex],
-        dosePerHa: Number(dosePerHa),
-        doseUnit: doseUnit,
-        totalQuantity: totalQuantity,
-        unit: product.unit
-      };
+      updatedProducts[existingIndex] = productData;
       
       setFormData(prev => ({
         ...prev,
@@ -257,16 +297,7 @@ const FumigationDialog = ({
       // Añadir nuevo producto
       setFormData(prev => ({
         ...prev,
-        selectedProducts: [
-          ...prev.selectedProducts,
-          {
-            productId: selectedProductId,
-            dosePerHa: Number(dosePerHa),
-            doseUnit: doseUnit,
-            totalQuantity: totalQuantity,
-            unit: product.unit
-          }
-        ]
+        selectedProducts: [...prev.selectedProducts, productData]
       }));
     }
     
@@ -290,6 +321,12 @@ const FumigationDialog = ({
   const getProductName = (productId) => {
     const product = products.find(p => p.id === productId);
     return product ? product.name : 'Producto desconocido';
+  };
+
+  // NUEVO: Calcular volumen total de mezcla considerando conversiones
+  const calculateTotalMixVolume = () => {
+    if (!formData.flowRate || !formData.totalSurface) return 0;
+    return (Number(formData.flowRate) * Number(formData.totalSurface)).toFixed(1);
   };
 
   // Validar formulario antes de guardar
@@ -568,7 +605,8 @@ const FumigationDialog = ({
               </div>
               
               <p className="help-text">
-                Seleccione los productos fitosanitarios que se aplicarán. El stock se descuenta automáticamente al completar la fumigación.
+                Seleccione los productos fitosanitarios que se aplicarán. Las dosis se pueden especificar en cc/ha o L/ha. 
+                El sistema convertirá automáticamente y el stock se descuenta al completar la fumigación.
               </p>
               
               {errors.selectedProducts && <div className="invalid-feedback">{errors.selectedProducts}</div>}
@@ -581,6 +619,9 @@ const FumigationDialog = ({
                         <span className="product-name">{getProductName(selectedProduct.productId)}</span>
                         <span className="product-dose">
                           Dosis: {selectedProduct.dosePerHa} {selectedProduct.doseUnit}
+                          {selectedProduct.conversion && (
+                            <span className="dose-conversion"> {selectedProduct.conversion}</span>
+                          )}
                         </span>
                       </div>
                       
@@ -644,6 +685,11 @@ const FumigationDialog = ({
                     disabled={submitting}
                   />
                   {errors.flowRate && <div className="invalid-feedback">{errors.flowRate}</div>}
+                  {formData.flowRate && formData.totalSurface && (
+                    <div className="form-text">
+                      Volumen total de mezcla: <strong>{calculateTotalMixVolume()} L</strong>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -766,7 +812,7 @@ const FumigationDialog = ({
         </button>
       </div>
       
-      {/* Selector de productos */}
+      {/* Selector de productos mejorado */}
       {productSelectorOpen && (
         <div className="product-selector-modal">
           <div className="product-selector-content">
@@ -819,16 +865,41 @@ const FumigationDialog = ({
                         style={{ width: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
                       >
                         <option value="L/ha">L/ha</option>
+                        <option value="cc/ha">cc/ha</option>
+                        <option value="ml/ha">ml/ha</option>
                         <option value="kg/ha">kg/ha</option>
                         <option value="g/ha">g/ha</option>
-                        <option value="ml/ha">ml/ha</option>
                       </select>
                     </div>
                     {dosePerHa && formData.totalSurface && (
                       <div className="total-calculation">
-                        <span>Total necesario: <strong>
-                          {(Number(dosePerHa) * Number(formData.totalSurface)).toFixed(2)} {doseUnit.split('/')[0]}
-                        </strong></span>
+                        <div className="dose-calculation">
+                          <span>Dosis total: <strong>
+                            {(Number(dosePerHa) * Number(formData.totalSurface)).toFixed(2)} {doseUnit.split('/')[0]}
+                          </strong></span>
+                          {showConversion(Number(dosePerHa), doseUnit) && (
+                            <span className="conversion-display">
+                              {showConversion(Number(dosePerHa), doseUnit)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="total-needed">
+                          <span>Total necesario: <strong>
+                            {(() => {
+                              const product = products.find(p => p.id === selectedProductId);
+                              if (!product) return '0';
+                              
+                              const doseInLiters = convertToLiters(Number(dosePerHa), doseUnit);
+                              const totalQuantity = doseInLiters * Number(formData.totalSurface);
+                              
+                              if (product.unit === 'ml' || product.unit === 'cc') {
+                                return (totalQuantity * 1000).toFixed(2) + ' ' + product.unit;
+                              } else {
+                                return totalQuantity.toFixed(2) + ' ' + product.unit;
+                              }
+                            })()}
+                          </strong></span>
+                        </div>
                       </div>
                     )}
                     {errors.productQuantity && (
