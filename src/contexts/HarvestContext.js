@@ -1,4 +1,4 @@
-// src/contexts/HarvestContext.js - Contexto para gestión de cosechas con productos
+// src/contexts/HarvestContext.js - Contexto corregido con integración de stock
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   collection, 
@@ -36,6 +36,8 @@ export function HarvestProvider({ children }) {
       setLoading(true);
       setError('');
       
+      console.log('Cargando cosechas desde Firestore...'); // Debug
+      
       // Crear consulta base
       const harvestsQuery = query(collection(db, 'harvests'), orderBy('plannedDate', 'desc'));
       const querySnapshot = await getDocs(harvestsQuery);
@@ -69,13 +71,15 @@ export function HarvestProvider({ children }) {
           qualityResults: harvestData.qualityResults || [],
           notes: harvestData.notes || '',
           harvestNotes: harvestData.harvestNotes || '',
-          // Nuevos campos para productos
+          // Campos para productos
           selectedProducts: harvestData.selectedProducts || [],
           productsHarvested: harvestData.productsHarvested || [],
           createdAt: harvestData.createdAt,
           updatedAt: harvestData.updatedAt
         });
       });
+      
+      console.log('Total cosechas cargadas:', harvestsData.length); // Debug
       
       // Aplicar filtros si se proporcionan
       if (filters.status) {
@@ -124,49 +128,92 @@ export function HarvestProvider({ children }) {
     }
   }, []);
 
-  // Añadir una cosecha
+  // CORREGIDO: Añadir una cosecha con descuento de stock automático
   const addHarvest = useCallback(async (harvestData) => {
     try {
       setError('');
       
-      // Preparar datos para Firestore
-      const dbHarvestData = {
-        field: harvestData.field || {},
-        fieldId: harvestData.fieldId || harvestData.field?.id || '',
-        crop: harvestData.crop || '',
-        lots: harvestData.lots || [],
-        totalArea: harvestData.totalArea || 0,
-        areaUnit: harvestData.areaUnit || 'ha',
-        status: harvestData.status || 'pending',
-        estimatedYield: harvestData.estimatedYield || 0,
-        yieldUnit: harvestData.yieldUnit || 'kg/ha',
-        harvestMethod: harvestData.harvestMethod || '',
-        machinery: harvestData.machinery || [],
-        workers: harvestData.workers || '',
-        targetWarehouse: harvestData.targetWarehouse || '',
-        qualityParameters: harvestData.qualityParameters || [],
-        notes: harvestData.notes || '',
-        // Nuevos campos para productos
-        selectedProducts: harvestData.selectedProducts || [],
-        productsHarvested: [], // Se llenará al completar la cosecha
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
+      console.log('Añadiendo cosecha con datos:', harvestData); // Debug
       
-      // Convertir fechas si existen
-      if (harvestData.plannedDate) {
-        if (harvestData.plannedDate instanceof Date) {
-          dbHarvestData.plannedDate = Timestamp.fromDate(harvestData.plannedDate);
+      // Usar transacción para asegurar consistencia
+      const harvestId = await runTransaction(db, async (transaction) => {
+        // Verificar y descontar stock de productos seleccionados
+        if (harvestData.selectedProducts && harvestData.selectedProducts.length > 0) {
+          console.log('Verificando stock de productos seleccionados...'); // Debug
+          
+          for (const selectedProduct of harvestData.selectedProducts) {
+            const productRef = doc(db, 'products', selectedProduct.productId);
+            const productDoc = await transaction.get(productRef);
+            
+            if (!productDoc.exists()) {
+              throw new Error(`El producto con ID ${selectedProduct.productId} no existe`);
+            }
+            
+            const productData = productDoc.data();
+            const currentStock = productData.stock || 0;
+            const quantityToUse = selectedProduct.quantity || 0;
+            
+            console.log(`Producto: ${productData.name}, Stock actual: ${currentStock}, Cantidad a usar: ${quantityToUse}`); // Debug
+            
+            // Verificar que hay suficiente stock
+            if (currentStock < quantityToUse) {
+              throw new Error(`No hay suficiente stock del producto ${productData.name}. Stock disponible: ${currentStock}, requerido: ${quantityToUse}`);
+            }
+            
+            // Descontar del stock
+            const newStock = currentStock - quantityToUse;
+            console.log(`Actualizando stock de ${productData.name} de ${currentStock} a ${newStock}`); // Debug
+            
+            transaction.update(productRef, {
+              stock: newStock,
+              updatedAt: serverTimestamp()
+            });
+          }
         }
-      }
+        
+        // Preparar datos para Firestore
+        const dbHarvestData = {
+          field: harvestData.field || {},
+          fieldId: harvestData.fieldId || harvestData.field?.id || '',
+          crop: harvestData.crop || '',
+          lots: harvestData.lots || [],
+          totalArea: harvestData.totalArea || 0,
+          areaUnit: harvestData.areaUnit || 'ha',
+          status: harvestData.status || 'pending',
+          estimatedYield: harvestData.estimatedYield || 0,
+          yieldUnit: harvestData.yieldUnit || 'kg/ha',
+          harvestMethod: harvestData.harvestMethod || '',
+          machinery: harvestData.machinery || [],
+          workers: harvestData.workers || '',
+          targetWarehouse: harvestData.targetWarehouse || '',
+          qualityParameters: harvestData.qualityParameters || [],
+          notes: harvestData.notes || '',
+          selectedProducts: harvestData.selectedProducts || [],
+          productsHarvested: [], // Se llenará al completar la cosecha
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        
+        // Convertir fechas si existen
+        if (harvestData.plannedDate) {
+          if (harvestData.plannedDate instanceof Date) {
+            dbHarvestData.plannedDate = Timestamp.fromDate(harvestData.plannedDate);
+          }
+        }
+        
+        // Insertar cosecha en Firestore
+        const harvestRef = doc(collection(db, 'harvests'));
+        transaction.set(harvestRef, dbHarvestData);
+        
+        return harvestRef.id;
+      });
       
-      // Insertar cosecha en Firestore
-      const harvestRef = await addDoc(collection(db, 'harvests'), dbHarvestData);
+      console.log('Cosecha creada con ID:', harvestId); // Debug
       
       // Recargar cosechas
       await loadHarvests();
       
-      return harvestRef.id;
+      return harvestId;
     } catch (error) {
       console.error('Error al añadir cosecha:', error);
       setError('Error al añadir cosecha: ' + error.message);
@@ -232,10 +279,12 @@ export function HarvestProvider({ children }) {
     }
   }, [loadHarvests]);
 
-  // Completar una cosecha - ACTUALIZADO para manejar productos
+  // CORREGIDO: Completar una cosecha con adición de productos al inventario
   const completeHarvest = useCallback(async (harvestId, harvestResults) => {
     try {
       setError('');
+      
+      console.log('Completando cosecha con resultados:', harvestResults); // Debug
       
       // Usar transacción para asegurar consistencia
       await runTransaction(db, async (transaction) => {
@@ -274,33 +323,45 @@ export function HarvestProvider({ children }) {
           updateData.productsHarvested = harvestResults.productsHarvested || [];
         }
         
-        // Actualizar stock de productos cosechados
-        if (harvestData.selectedProducts && harvestData.selectedProducts.length > 0) {
-          for (const selectedProduct of harvestData.selectedProducts) {
-            const productRef = doc(db, 'products', selectedProduct.productId);
-            const productDoc = await transaction.get(productRef);
+        // CORREGIDO: Añadir productos cosechados al inventario
+        if (harvestResults.productsHarvested && harvestResults.productsHarvested.length > 0) {
+          console.log('Añadiendo productos cosechados al inventario...'); // Debug
+          
+          for (const harvestedProduct of harvestResults.productsHarvested) {
+            console.log('Procesando producto cosechado:', harvestedProduct); // Debug
             
-            if (productDoc.exists()) {
-              const productData = productDoc.data();
-              const currentStock = productData.stock || 0;
-              const quantityToHarvest = selectedProduct.quantity || 0;
-              
-              // Verificar que hay suficiente stock
-              if (currentStock >= quantityToHarvest) {
-                const newStock = currentStock - quantityToHarvest;
-                transaction.update(productRef, {
-                  stock: newStock,
-                  updatedAt: serverTimestamp()
-                });
-              } else {
-                throw new Error(`No hay suficiente stock del producto ${productData.name}. Stock disponible: ${currentStock}, requerido: ${quantityToHarvest}`);
-              }
-            }
+            // Crear nuevo producto en el inventario
+            const newProductData = {
+              name: harvestedProduct.name,
+              category: harvestedProduct.category || 'insumo',
+              unit: harvestedProduct.unit || 'kg',
+              stock: Number(harvestedProduct.quantity) || 0,
+              minStock: 0,
+              storageType: 'bolsas',
+              fieldId: harvestData.fieldId || null,
+              warehouseId: harvestedProduct.warehouseId || harvestData.targetWarehouse || null,
+              storageLevel: harvestedProduct.warehouseId ? 'warehouse' : 'field',
+              lotNumber: `COSECHA-${harvestId.substring(0, 8)}-${Date.now()}`,
+              tags: ['cosecha', harvestData.crop || 'cultivo'],
+              notes: `Producto obtenido de cosecha de ${harvestData.crop || 'cultivo'} el ${new Date().toLocaleDateString()}`,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            };
+            
+            console.log('Datos del nuevo producto:', newProductData); // Debug
+            
+            // Insertar nuevo producto
+            const productRef = doc(collection(db, 'products'));
+            transaction.set(productRef, newProductData);
+            
+            console.log('Producto añadido al inventario:', harvestedProduct.name); // Debug
           }
         }
         
         // Actualizar la cosecha
         transaction.update(harvestRef, updateData);
+        
+        console.log('Cosecha completada exitosamente'); // Debug
       });
       
       // Recargar cosechas

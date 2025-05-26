@@ -1,4 +1,4 @@
-// src/pages/Harvests.js - Página principal de cosechas que conecta con el controlador
+// src/pages/Harvests.js - Página principal de cosechas corregida
 import React from 'react';
 import HarvestsPanel from '../components/panels/Harvests/HarvestsPanel';
 import useHarvestsController from '../controllers/HarvestsController';
@@ -6,8 +6,10 @@ import useHarvestsController from '../controllers/HarvestsController';
 const Harvests = () => {
   // Usar el controlador para obtener datos y funciones
   const {
-    harvests,
-    fields,
+    harvests = [], // CORREGIDO: Valor por defecto
+    fields = [], // CORREGIDO: Valor por defecto
+    products = [], // CORREGIDO: Valor por defecto
+    warehouses = [], // CORREGIDO: Valor por defecto
     loading,
     error,
     selectedHarvest,
@@ -34,6 +36,8 @@ const Harvests = () => {
     <HarvestsPanel
       harvests={harvests}
       fields={fields}
+      products={products} // CORREGIDO: Asegurar que se pase products
+      warehouses={warehouses} // CORREGIDO: Asegurar que se pase warehouses
       loading={loading}
       error={error}
       selectedHarvest={selectedHarvest}

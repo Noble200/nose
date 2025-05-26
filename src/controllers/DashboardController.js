@@ -1,3 +1,4 @@
+// src/controllers/DashboardController.js - Controlador corregido del Dashboard
 import { useState, useEffect, useCallback } from 'react';
 import { useStock } from '../contexts/StockContext';
 import { useHarvests } from '../contexts/HarvestContext'; 
@@ -5,10 +6,10 @@ import { useHarvests } from '../contexts/HarvestContext';
 // Controlador del Dashboard (lógica separada de la presentación)
 const useDashboardController = () => {
   const { 
-    products, 
-    warehouses, 
-    transfers, 
-    fumigations, 
+    products = [], // CORREGIDO: Valor por defecto como array vacío
+    warehouses = [], // CORREGIDO: Valor por defecto como array vacío
+    transfers = [], // CORREGIDO: Valor por defecto como array vacío
+    fumigations = [], // CORREGIDO: Valor por defecto como array vacío
     loading: stockLoading, 
     error: stockError, 
     loadProducts,
@@ -16,7 +17,7 @@ const useDashboardController = () => {
   } = useStock();
   
   const {
-    harvests,
+    harvests = [], // CORREGIDO: Valor por defecto como array vacío
     loading: harvestsLoading,
     error: harvestsError,
     loadHarvests
@@ -41,10 +42,19 @@ const useDashboardController = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Calcular estadísticas y listas filtradas
+  // CORREGIDO: Calcular estadísticas y listas filtradas con verificación de arrays
   const processData = useCallback(() => {
     console.log('Procesando datos del dashboard...'); // Debug
-    console.log('Productos disponibles:', products.length); // Debug
+    console.log('Productos disponibles:', Array.isArray(products) ? products.length : 0); // Debug
+    
+    // CORREGIDO: Verificar que products sea un array antes de usar filter
+    if (!Array.isArray(products)) {
+      console.warn('Products no es un array:', products);
+      setLowStockProducts([]);
+      setExpiringSoonProducts([]);
+      setStats(prev => ({ ...prev, totalProducts: 0, lowStockCount: 0, expiringCount: 0 }));
+      return;
+    }
     
     // Calcular productos con stock bajo - CORREGIDO
     const lowStock = products.filter(product => {
@@ -73,64 +83,78 @@ const useDashboardController = () => {
       })
       .slice(0, 5);
     
-    // Obtener transferencias pendientes
-    const pendingTransfs = transfers
-      .filter(transfer => transfer.status === 'pending')
-      .map(transfer => ({
-        ...transfer,
-        sourceWarehouseName: getWarehouseName(transfer.sourceWarehouseId),
-        targetWarehouseName: getWarehouseName(transfer.targetWarehouseId)
-      }))
-      .slice(0, 5);
+    // CORREGIDO: Obtener transferencias pendientes con verificación de array
+    const pendingTransfs = Array.isArray(transfers) 
+      ? transfers
+          .filter(transfer => transfer.status === 'pending')
+          .map(transfer => ({
+            ...transfer,
+            sourceWarehouseName: getWarehouseName(transfer.sourceWarehouseId),
+            targetWarehouseName: getWarehouseName(transfer.targetWarehouseId)
+          }))
+          .slice(0, 5)
+      : [];
     
-    // Obtener fumigaciones pendientes
-    const pendingFumigs = fumigations
-      .filter(fumigation => fumigation.status === 'pending' || fumigation.status === 'scheduled')
-      .slice(0, 5);
+    // CORREGIDO: Obtener fumigaciones pendientes con verificación de array
+    const pendingFumigs = Array.isArray(fumigations)
+      ? fumigations
+          .filter(fumigation => fumigation.status === 'pending' || fumigation.status === 'scheduled')
+          .slice(0, 5)
+      : [];
     
-    // Obtener cosechas próximas
+    // CORREGIDO: Obtener cosechas próximas con verificación de array
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(currentDate.getDate() + 90);
     
-    const upcoming = (harvests || [])
-      .filter(harvest => {
-        const plannedDate = harvest.plannedDate
-          ? new Date(harvest.plannedDate.seconds ? harvest.plannedDate.seconds * 1000 : harvest.plannedDate)
-          : null;
-        return plannedDate && plannedDate > currentDate && plannedDate < ninetyDaysFromNow &&
-               (harvest.status === 'pending' || harvest.status === 'scheduled');
-      })
-      .sort((a, b) => {
-        const dateA = a.plannedDate.seconds ? a.plannedDate.seconds * 1000 : a.plannedDate;
-        const dateB = b.plannedDate.seconds ? b.plannedDate.seconds * 1000 : b.plannedDate;
-        return new Date(dateA) - new Date(dateB);
-      })
-      .slice(0, 5);
+    const upcoming = Array.isArray(harvests)
+      ? harvests
+          .filter(harvest => {
+            const plannedDate = harvest.plannedDate
+              ? new Date(harvest.plannedDate.seconds ? harvest.plannedDate.seconds * 1000 : harvest.plannedDate)
+              : null;
+            return plannedDate && plannedDate > currentDate && plannedDate < ninetyDaysFromNow &&
+                   (harvest.status === 'pending' || harvest.status === 'scheduled');
+          })
+          .sort((a, b) => {
+            const dateA = a.plannedDate.seconds ? a.plannedDate.seconds * 1000 : a.plannedDate;
+            const dateB = b.plannedDate.seconds ? b.plannedDate.seconds * 1000 : b.plannedDate;
+            return new Date(dateA) - new Date(dateB);
+          })
+          .slice(0, 5)
+      : [];
     
-    // Generar actividades recientes
-    const allActivities = [
-      ...transfers.map(transfer => ({
+    // CORREGIDO: Generar actividades recientes con verificación de arrays
+    const allActivities = [];
+    
+    if (Array.isArray(transfers)) {
+      allActivities.push(...transfers.map(transfer => ({
         type: 'transfer',
         id: transfer.id,
         date: transfer.updatedAt ? new Date(transfer.updatedAt.seconds * 1000) : new Date(),
-        description: `Transferencia de ${transfer.products.length} producto(s) de ${getWarehouseName(transfer.sourceWarehouseId)} a ${getWarehouseName(transfer.targetWarehouseId)}`,
+        description: `Transferencia de ${transfer.products?.length || 0} producto(s) de ${getWarehouseName(transfer.sourceWarehouseId)} a ${getWarehouseName(transfer.targetWarehouseId)}`,
         status: transfer.status
-      })),
-      ...fumigations.map(fumigation => ({
+      })));
+    }
+    
+    if (Array.isArray(fumigations)) {
+      allActivities.push(...fumigations.map(fumigation => ({
         type: 'fumigation',
         id: fumigation.id,
         date: fumigation.updatedAt ? new Date(fumigation.updatedAt.seconds * 1000) : new Date(),
         description: `Fumigación en ${fumigation.establishment} (${fumigation.surface} ha)`,
         status: fumigation.status
-      })),
-      ...(harvests || []).map(harvest => ({
+      })));
+    }
+    
+    if (Array.isArray(harvests)) {
+      allActivities.push(...harvests.map(harvest => ({
         type: 'harvest',
         id: harvest.id,
         date: harvest.updatedAt ? new Date(harvest.updatedAt.seconds * 1000) : new Date(),
-        description: `Cosecha de ${harvest.crop} en ${harvest.establishment} (${harvest.surface} ha)`,
+        description: `Cosecha de ${harvest.crop} en ${harvest.establishment || harvest.field?.name || 'Campo'} (${harvest.totalArea || 0} ha)`,
         status: harvest.status
-      }))
-    ];
+      })));
+    }
     
     // Ordenar por fecha descendente y tomar los 10 más recientes
     const recent = allActivities
@@ -150,7 +174,7 @@ const useDashboardController = () => {
       totalProducts: products.length,
       lowStockCount: lowStock.length,
       expiringCount: expiringSoon.length,
-      warehouseCount: warehouses.length,
+      warehouseCount: Array.isArray(warehouses) ? warehouses.length : 0,
       pendingTransfersCount: pendingTransfs.length,
       pendingFumigationsCount: pendingFumigs.length,
       upcomingHarvestsCount: upcoming.length
@@ -164,8 +188,12 @@ const useDashboardController = () => {
     
   }, [products, warehouses, transfers, fumigations, harvests]);
   
-  // Función para obtener el nombre de un almacén por ID
+  // CORREGIDO: Función para obtener el nombre de un almacén por ID con verificación de array
   const getWarehouseName = (warehouseId) => {
+    if (!Array.isArray(warehouses) || !warehouseId) {
+      return 'Almacén desconocido';
+    }
+    
     const warehouse = warehouses.find(w => w.id === warehouseId);
     return warehouse ? warehouse.name : 'Almacén desconocido';
   };

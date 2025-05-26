@@ -1,4 +1,4 @@
-// src/controllers/HarvestsController.js - Controlador con la lógica para las cosechas
+// src/controllers/HarvestsController.js - Controlador corregido para las cosechas
 import { useState, useEffect, useCallback } from 'react';
 import { useHarvests } from '../contexts/HarvestContext';
 import { useStock } from '../contexts/StockContext';
@@ -16,10 +16,14 @@ const useHarvestsController = () => {
   } = useHarvests();
   
   const {
-    fields,
+    fields = [], // CORREGIDO: Valor por defecto como array vacío
+    products = [], // CORREGIDO: Valor por defecto como array vacío
+    warehouses = [], // CORREGIDO: Valor por defecto como array vacío
     loading: fieldsLoading,
     error: fieldsError,
     loadFields,
+    loadProducts,
+    loadWarehouses
   } = useStock();
 
   // Estados locales
@@ -39,23 +43,23 @@ const useHarvestsController = () => {
   const [error, setError] = useState('');
   const [filteredHarvestsList, setFilteredHarvestsList] = useState([]);
 
-  // Cargar campos y cosechas al iniciar
+  // CORREGIDO: Cargar campos, productos y almacenes al iniciar
   const loadData = useCallback(async () => {
     try {
       setError('');
       
-      // Cargar campos si no están cargados
-      if (fields.length === 0) {
-        await loadFields();
-      }
-      
-      // Cargar cosechas
-      await loadHarvests();
+      // Cargar todos los datos necesarios
+      await Promise.all([
+        loadFields(),
+        loadProducts(), 
+        loadWarehouses(),
+        loadHarvests()
+      ]);
     } catch (err) {
       console.error('Error al cargar datos:', err);
       setError('Error al cargar datos: ' + err.message);
     }
-  }, [loadFields, loadHarvests, fields.length]);
+  }, [loadFields, loadProducts, loadWarehouses, loadHarvests]);
 
   // Actualizar estado de carga y error
   useEffect(() => {
@@ -77,9 +81,10 @@ const useHarvestsController = () => {
     loadData();
   }, [loadData]);
 
-  // Filtrar cosechas según filtros aplicados
+  // CORREGIDO: Filtrar cosechas con verificación de arrays
   const getFilteredHarvests = useCallback(() => {
-    if (!harvests || harvests.length === 0) return [];
+    // CORREGIDO: Verificar que harvests sea un array
+    if (!Array.isArray(harvests) || harvests.length === 0) return [];
     
     // Hacer una copia del array para no modificar el original
     const harvestsWithFieldRefs = harvests.map(harvest => {
@@ -88,11 +93,19 @@ const useHarvestsController = () => {
         return harvest;
       }
       
+      // CORREGIDO: Verificar que fields sea un array antes de usar find
+      if (!Array.isArray(fields)) {
+        return {
+          ...harvest,
+          field: { id: harvest.fieldId || '', name: 'Campo desconocido' }
+        };
+      }
+      
       // Si no, buscar el campo por ID
       const field = fields.find(f => f.id === harvest.fieldId);
       return {
         ...harvest,
-        field: field ? { id: field.id, name: field.name } : { id: harvest.fieldId, name: 'Campo desconocido' }
+        field: field ? { id: field.id, name: field.name } : { id: harvest.fieldId || '', name: 'Campo desconocido' }
       };
     });
     
@@ -194,16 +207,18 @@ const useHarvestsController = () => {
 
   // Confirmar eliminación de cosecha
   const handleDeleteHarvest = useCallback(async (harvestId) => {
-    try {
-      await deleteHarvest(harvestId);
-      
-      // Cerrar el diálogo si estaba abierto para esta cosecha
-      if (selectedHarvest && selectedHarvest.id === harvestId) {
-        setDialogOpen(false);
+    if (window.confirm('¿Estás seguro de que deseas eliminar esta cosecha? Esta acción no se puede deshacer.')) {
+      try {
+        await deleteHarvest(harvestId);
+        
+        // Cerrar el diálogo si estaba abierto para esta cosecha
+        if (selectedHarvest && selectedHarvest.id === harvestId) {
+          setDialogOpen(false);
+        }
+      } catch (err) {
+        console.error('Error al eliminar cosecha:', err);
+        setError('Error al eliminar cosecha: ' + err.message);
       }
-    } catch (err) {
-      console.error('Error al eliminar cosecha:', err);
-      setError('Error al eliminar cosecha: ' + err.message);
     }
   }, [deleteHarvest, selectedHarvest]);
 
@@ -296,7 +311,9 @@ const useHarvestsController = () => {
 
   return {
     harvests: filteredHarvestsList,
-    fields,
+    fields: Array.isArray(fields) ? fields : [], // CORREGIDO: Asegurar que sea un array
+    products: Array.isArray(products) ? products : [], // CORREGIDO: Asegurar que sea un array
+    warehouses: Array.isArray(warehouses) ? warehouses : [], // CORREGIDO: Asegurar que sea un array
     loading,
     error,
     selectedHarvest,

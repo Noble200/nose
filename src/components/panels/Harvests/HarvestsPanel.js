@@ -1,4 +1,4 @@
-// src/components/panels/Harvests/HarvestsPanel.js
+// src/components/panels/Harvests/HarvestsPanel.js - Corregido
 import React from 'react';
 import './harvests.css';
 import HarvestDialog from './HarvestDialog';
@@ -6,10 +6,10 @@ import HarvestDetailDialog from './HarvestDetailDialog';
 import CompleteHarvestDialog from './CompleteHarvestDialog';
 
 const HarvestsPanel = ({
-  harvests,
-  fields,
-  products,
-  warehouses,
+  harvests = [], // CORREGIDO: Valor por defecto
+  fields = [], // CORREGIDO: Valor por defecto
+  products = [], // CORREGIDO: Valor por defecto
+  warehouses = [], // CORREGIDO: Valor por defecto
   loading,
   error,
   selectedHarvest,
@@ -45,13 +45,13 @@ const HarvestsPanel = ({
     });
   };
 
-  // Función para obtener el nombre del campo
+  // CORREGIDO: Función para obtener el nombre del campo con verificación
   const getFieldName = (harvest) => {
     if (harvest.field && harvest.field.name) {
       return harvest.field.name;
     }
     
-    if (harvest.fieldId) {
+    if (harvest.fieldId && Array.isArray(fields)) {
       const field = fields.find(f => f.id === harvest.fieldId);
       return field ? field.name : 'Campo desconocido';
     }
@@ -111,10 +111,18 @@ const HarvestsPanel = ({
     }
   };
   
-  // Obtener los productos asignados a una cosecha
+  // CORREGIDO: Obtener los productos asignados a una cosecha con verificación
   const getSelectedProducts = (harvest) => {
-    if (!harvest.selectedProducts || harvest.selectedProducts.length === 0) {
+    if (!harvest.selectedProducts || !Array.isArray(harvest.selectedProducts) || harvest.selectedProducts.length === 0) {
       return [];
+    }
+    
+    if (!Array.isArray(products)) {
+      return harvest.selectedProducts.map(selectedProduct => ({
+        ...selectedProduct,
+        name: 'Producto desconocido',
+        unit: ''
+      }));
     }
     
     return harvest.selectedProducts.map(selectedProduct => {
@@ -127,9 +135,25 @@ const HarvestsPanel = ({
     });
   };
 
-  // Función para obtener el texto del destino de almacenamiento
+  // Función para mostrar información de debug
+  const showDebugInfo = (harvest) => {
+    console.log('=== DEBUG COSECHA ===');
+    console.log('ID:', harvest.id);
+    console.log('Estado:', harvest.status);
+    console.log('Productos seleccionados:', harvest.selectedProducts);
+    console.log('Productos cosechados:', harvest.productsHarvested);
+    console.log('==================');
+  };
+
+  // CORREGIDO: Función para obtener el texto del destino de almacenamiento con verificación
   const getDestinationText = (harvest) => {
     if (!harvest.targetWarehouse) return 'No asignado';
+    
+    // CORREGIDO: Verificar que warehouses sea un array antes de usar find
+    if (!Array.isArray(warehouses)) {
+      console.warn('Warehouses no es un array:', warehouses);
+      return 'Almacén desconocido';
+    }
     
     const warehouse = warehouses.find(w => w.id === harvest.targetWarehouse);
     return warehouse ? warehouse.name : 'Almacén desconocido';
@@ -178,7 +202,7 @@ const HarvestsPanel = ({
               onChange={(e) => onFilterChange('status', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {filterOptions.status.map((option) => (
+              {Array.isArray(filterOptions?.status) && filterOptions.status.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -194,7 +218,7 @@ const HarvestsPanel = ({
               onChange={(e) => onFilterChange('crop', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {filterOptions.crops.map((option) => (
+              {Array.isArray(filterOptions?.crops) && filterOptions.crops.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -211,7 +235,7 @@ const HarvestsPanel = ({
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
               <option value="all">Todos los campos</option>
-              {fields.map((field) => (
+              {Array.isArray(fields) && fields.map((field) => (
                 <option key={field.id} value={field.id}>
                   {field.name}
                 </option>
@@ -226,7 +250,7 @@ const HarvestsPanel = ({
                 type="date"
                 className="form-control"
                 onChange={(e) => onFilterChange('dateRange', { 
-                  ...filterOptions.dateRange, 
+                  ...(filterOptions?.dateRange || {}), 
                   start: e.target.value || null 
                 })}
                 style={{ height: 'auto', minHeight: '40px' }}
@@ -236,7 +260,7 @@ const HarvestsPanel = ({
                 type="date"
                 className="form-control"
                 onChange={(e) => onFilterChange('dateRange', { 
-                  ...filterOptions.dateRange, 
+                  ...(filterOptions?.dateRange || {}), 
                   end: e.target.value || null 
                 })}
                 style={{ height: 'auto', minHeight: '40px' }}
@@ -267,8 +291,8 @@ const HarvestsPanel = ({
         </div>
       )}
 
-      {/* Grid de cosechas */}
-      {harvests.length > 0 ? (
+      {/* CORREGIDO: Grid de cosechas con verificación de array */}
+      {Array.isArray(harvests) && harvests.length > 0 ? (
         <div className="harvests-grid">
           {harvests.map((harvest) => (
             <div key={harvest.id} className="harvest-card">
@@ -277,7 +301,7 @@ const HarvestsPanel = ({
                   <div className="harvest-icon">
                     <i className="fas fa-tractor"></i>
                   </div>
-                  <h3 className="harvest-title">{harvest.crop}</h3>
+                  <h3 className="harvest-title">{harvest.crop || 'Sin cultivo'}</h3>
                 </div>
                 {renderStatusChip(harvest.status)}
               </div>
@@ -291,7 +315,7 @@ const HarvestsPanel = ({
                   
                   <div className="harvest-detail">
                     <span className="detail-label">Superficie</span>
-                    <span className="detail-value">{harvest.totalArea} {harvest.areaUnit || 'ha'}</span>
+                    <span className="detail-value">{harvest.totalArea || 0} {harvest.areaUnit || 'ha'}</span>
                   </div>
                   
                   <div className="harvest-detail">
@@ -367,7 +391,10 @@ const HarvestsPanel = ({
                   {harvest.status !== 'completed' && harvest.status !== 'cancelled' && (
                     <button
                       className="btn btn-sm btn-primary"
-                      onClick={() => onCompleteHarvest(harvest)}
+                      onClick={() => {
+                        showDebugInfo(harvest); // Debug
+                        onCompleteHarvest(harvest);
+                      }}
                     >
                       <i className="fas fa-check"></i> Completar
                     </button>
