@@ -1423,3 +1423,504 @@
   color: var(--text-primary);
   font-weight: var(--font-weight-medium);
 }
+
+/* Diálogo de PDF */
+.fumigation-pdf-dialog {
+  max-width: 900px !important;
+}
+
+.pdf-generator-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* Sección de productos en PDF */
+.pdf-products-section {
+  background-color: var(--gray-50);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+}
+
+.pdf-products-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.pdf-product-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm);
+  background-color: var(--bg-paper);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--gray-200);
+}
+
+/* Sección de imagen del mapa */
+.map-image-section {
+  background-color: var(--gray-50);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+}
+
+.image-upload-area {
+  margin-top: var(--spacing-md);
+}
+
+.upload-dropzone {
+  border: 2px dashed var(--gray-300);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-xxl);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background-color: var(--bg-paper);
+}
+
+.upload-dropzone:hover {
+  border-color: var(--primary);
+  background-color: var(--primary-bg);
+}
+
+.upload-dropzone:active {
+  transform: scale(0.98);
+}
+
+.upload-icon {
+  font-size: 3rem;
+  color: var(--gray-400);
+  margin-bottom: var(--spacing-md);
+}
+
+.upload-dropzone:hover .upload-icon {
+  color: var(--primary);
+}
+
+.upload-text {
+  color: var(--text-secondary);
+}
+
+.upload-text strong {
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  display: block;
+  margin-bottom: var(--spacing-xs);
+}
+
+.upload-text p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+/* Preview de imagen */
+.image-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.image-preview {
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  background-color: var(--bg-paper);
+  box-shadow: var(--shadow-sm);
+}
+
+.image-preview img {
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  display: block;
+}
+
+.image-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: center;
+}
+
+/* Preview del PDF */
+.pdf-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.pdf-preview-container {
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  background-color: var(--gray-50);
+  position: relative;
+}
+
+.pdf-preview-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.pdf-preview-loading .spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.pdf-preview-loading p {
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  margin: 0;
+}
+
+.pdf-preview-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Botón de PDF en la vista de detalles */
+.pdf-button {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: var(--text-white);
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  box-shadow: var(--shadow-sm);
+}
+
+.pdf-button:hover {
+  background: linear-gradient(135deg, #c0392b, #a93226);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.pdf-button:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.pdf-button i {
+  font-size: var(--font-size-md);
+}
+
+/* Botón de PDF en la lista de fumigaciones */
+.fumigation-actions .pdf-button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+}
+
+/* Indicador de estado del PDF */
+.pdf-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+.pdf-status-indicator.ready {
+  color: var(--success);
+}
+
+.pdf-status-indicator.generating {
+  color: var(--warning);
+}
+
+.pdf-status-indicator.error {
+  color: var(--danger);
+}
+
+/* Información del PDF */
+.pdf-info {
+  background-color: var(--info-bg);
+  border: 1px solid rgba(33, 150, 243, 0.2);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.pdf-info-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--info);
+  margin-bottom: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.pdf-info-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Progreso de generación */
+.pdf-generation-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background-color: var(--primary-bg);
+  border-radius: var(--border-radius-md);
+  margin: var(--spacing-md) 0;
+}
+
+.pdf-generation-progress .spinner-border-sm {
+  color: var(--primary);
+}
+
+.pdf-generation-text {
+  font-size: var(--font-size-sm);
+  color: var(--primary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Advertencias sobre la imagen */
+.image-warning {
+  background-color: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.image-warning-text {
+  font-size: var(--font-size-xs);
+  color: var(--warning);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Stats de la imagen */
+.image-stats {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.image-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Mejorar la tabla de resumen */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+  padding: var(--spacing-sm);
+  background-color: var(--bg-paper);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--gray-200);
+}
+
+.summary-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Animaciones */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pdf-preview-container iframe {
+  animation: fadeInScale 0.3s ease-out;
+}
+
+.image-preview img {
+  animation: fadeInScale 0.3s ease-out;
+}
+
+/* Estados de carga específicos */
+.pdf-generating {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.pdf-generating::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 1;
+}
+
+.pdf-generating::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .fumigation-pdf-dialog {
+    width: 95vw;
+    max-width: none !important;
+    height: 90vh;
+    margin: 5vh auto;
+  }
+  
+  .pdf-preview-container {
+    height: 400px;
+  }
+  
+  .pdf-preview-container iframe {
+    height: 400px;
+  }
+  
+  .image-preview img {
+    max-height: 200px;
+  }
+  
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .pdf-preview-actions {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .image-actions {
+    flex-direction: column;
+  }
+  
+  .upload-dropzone {
+    padding: var(--spacing-lg);
+  }
+  
+  .upload-icon {
+    font-size: 2rem;
+    margin-bottom: var(--spacing-sm);
+  }
+}
+
+/* Estados específicos para diferentes tipos de fumigación */
+.fumigation-card.ready-for-pdf {
+  border-left: 4px solid var(--success);
+}
+
+.fumigation-card.ready-for-pdf .pdf-button {
+  background: linear-gradient(135deg, #27ae60, #229954);
+}
+
+.fumigation-card.ready-for-pdf .pdf-button:hover {
+  background: linear-gradient(135deg, #229954, #1e8449);
+}
+
+/* Tooltip para botones de PDF */
+.pdf-button-tooltip {
+  position: relative;
+}
+
+.pdf-button-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--gray-900);
+  color: var(--text-white);
+  font-size: var(--font-size-xs);
+  border-radius: var(--border-radius-sm);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--transition-fast);
+  z-index: var(--z-index-tooltip);
+  margin-bottom: var(--spacing-xs);
+}
+
+.pdf-button-tooltip:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Indicadores de calidad de imagen */
+.image-quality-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-xxs) var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.image-quality-indicator.good {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: var(--success);
+}
+
+.image-quality-indicator.medium {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: var(--warning);
+}
+
+.image-quality-indicator.poor {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: var(--danger);
+}
