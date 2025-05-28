@@ -1,4 +1,4 @@
-// src/components/panels/Fumigations/CompleteFumigationDialog.js
+// src/components/panels/Fumigations/CompleteFumigationDialog.js - CORREGIDO
 import React, { useState, useEffect } from 'react';
 
 const CompleteFumigationDialog = ({ 
@@ -35,15 +35,24 @@ const CompleteFumigationDialog = ({
         }
       }));
     }
+
+    // CORREGIDO: Establecer valores por defecto más flexibles
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // Una hora atrás
+    
+    // Solo establecer valores por defecto si no hay fechas ya configuradas
+    setFormData(prev => ({
+      ...prev,
+      startDateTime: prev.startDateTime || formatDateTimeForInput(oneHourAgo),
+      endDateTime: prev.endDateTime || formatDateTimeForInput(now)
+    }));
   }, [fumigation]);
 
-  // Formatear fecha y hora para input datetime-local
+  // CORREGIDO: Formatear fecha y hora para input datetime-local
   const formatDateTimeForInput = (date) => {
     if (!date) return '';
     
-    const d = date.seconds
-      ? new Date(date.seconds * 1000)
-      : new Date(date);
+    const d = new Date(date);
     
     // Formatear como YYYY-MM-DDTHH:MM
     const year = d.getFullYear();
@@ -117,14 +126,8 @@ const CompleteFumigationDialog = ({
         newErrors.endDateTime = 'La hora de finalización debe ser posterior a la de inicio';
       }
       
-      // Validar que las fechas no sean futuras
-      const now = new Date();
-      if (start > now) {
-        newErrors.startDateTime = 'La hora de inicio no puede ser futura';
-      }
-      if (end > now) {
-        newErrors.endDateTime = 'La hora de finalización no puede ser futura';
-      }
+      // CORREGIDO: Eliminamos las validaciones de fechas futuras
+      // Los usuarios pueden establecer libremente las fechas de inicio y fin
     }
     
     // Validar condiciones climáticas (opcionales pero si se llenan deben ser válidas)
@@ -330,6 +333,7 @@ const CompleteFumigationDialog = ({
             {/* Tiempos de aplicación */}
             <div className="form-section">
               <h3 className="section-title">Tiempos de aplicación</h3>
+              <p className="form-help-text">Ingrese las horas reales de inicio y finalización de la fumigación.</p>
               
               <div className="form-grid">
                 <div className="form-group">

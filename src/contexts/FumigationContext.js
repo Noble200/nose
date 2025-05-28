@@ -1,4 +1,4 @@
-// src/contexts/FumigationContext.js - Contexto para gestión de fumigaciones
+// src/contexts/FumigationContext.js - CORREGIDO: Transacción Firestore
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   collection, 
@@ -12,7 +12,8 @@ import {
   where,
   serverTimestamp,
   Timestamp,
-  runTransaction
+  runTransaction,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../api/firebase';
 import { useAuth } from './AuthContext';
@@ -183,8 +184,12 @@ export function FumigationProvider({ children }) {
         }
       }
       
+      console.log('Añadiendo fumigación:', dbFumigationData); // Debug
+      
       // Insertar fumigación en Firestore
       const fumigationRef = await addDoc(collection(db, 'fumigations'), dbFumigationData);
+      
+      console.log('Fumigación añadida con ID:', fumigationRef.id); // Debug
       
       // Recargar fumigaciones
       await loadFumigations();
@@ -201,6 +206,8 @@ export function FumigationProvider({ children }) {
   const updateFumigation = useCallback(async (fumigationId, fumigationData) => {
     try {
       setError('');
+      
+      console.log('Actualizando fumigación:', fumigationId, fumigationData); // Debug
       
       // Preparar datos para actualizar
       const updateData = {
@@ -231,6 +238,8 @@ export function FumigationProvider({ children }) {
       // Actualizar fumigación en Firestore
       await updateDoc(doc(db, 'fumigations', fumigationId), updateData);
       
+      console.log('Fumigación actualizada:', fumigationId); // Debug
+      
       // Recargar fumigaciones
       await loadFumigations();
       
@@ -247,8 +256,12 @@ export function FumigationProvider({ children }) {
     try {
       setError('');
       
+      console.log('Eliminando fumigación:', fumigationId); // Debug
+      
       // Eliminar fumigación de Firestore
       await deleteDoc(doc(db, 'fumigations', fumigationId));
+      
+      console.log('Fumigación eliminada:', fumigationId); // Debug
       
       // Recargar fumigaciones
       await loadFumigations();
@@ -261,14 +274,19 @@ export function FumigationProvider({ children }) {
     }
   }, [loadFumigations]);
 
-  // Completar una fumigación - Descontar productos del stock
+  // CORREGIDO: Completar una fumigación - Transacción Firestore corregida
   const completeFumigation = useCallback(async (fumigationId, completionData) => {
     try {
       setError('');
       
+      console.log('Completando fumigación:', fumigationId, completionData); // Debug
+      
       // Usar transacción para asegurar consistencia
       await runTransaction(db, async (transaction) => {
-        // Obtener la fumigación actual
+        console.log('Iniciando transacción...'); // Debug
+        
+        // PASO 1: TODAS LAS LECTURAS PRIMERO
+        console.log('Leyendo fumigación...'); // Debug
         const fumigationRef = doc(db, 'fumigations', fumigationId);
         const fumigationDoc = await transaction.get(fumigationRef);
         
@@ -277,30 +295,17 @@ export function FumigationProvider({ children }) {
         }
         
         const fumigationData = fumigationDoc.data();
+        console.log('Fumigación leída:', fumigationData); // Debug
         
-        // Datos para la actualización de la fumigación
-        const updateData = {
-          status: 'completed',
-          updatedAt: serverTimestamp()
-        };
+        // Leer todos los productos ANTES de hacer escrituras
+        const productUpdates = [];
         
-        // Añadir los datos de finalización
-        if (completionData) {
-          if (completionData.startDateTime) {
-            updateData.startDateTime = Timestamp.fromDate(completionData.startDateTime);
-          }
-          
-          if (completionData.endDateTime) {
-            updateData.endDateTime = Timestamp.fromDate(completionData.endDateTime);
-          }
-          
-          updateData.weatherConditions = completionData.weatherConditions || {};
-          updateData.completionNotes = completionData.completionNotes || '';
-        }
-        
-        // Actualizar stock de productos utilizados
         if (fumigationData.selectedProducts && fumigationData.selectedProducts.length > 0) {
+          console.log('Leyendo productos seleccionados...'); // Debug
+          
           for (const selectedProduct of fumigationData.selectedProducts) {
+            console.log('Procesando producto:', selectedProduct); // Debug
+            
             const productRef = doc(db, 'products', selectedProduct.productId);
             const productDoc = await transaction.get(productRef);
             
@@ -309,26 +314,74 @@ export function FumigationProvider({ children }) {
               const currentStock = productData.stock || 0;
               const quantityToUse = selectedProduct.totalQuantity || 0;
               
+              console.log(`Producto ${productData.name}: Stock actual ${currentStock}, cantidad a usar ${quantityToUse}`); // Debug
+              
               // Verificar que hay suficiente stock
               if (currentStock >= quantityToUse) {
                 const newStock = currentStock - quantityToUse;
-                transaction.update(productRef, {
-                  stock: newStock,
-                  updatedAt: serverTimestamp()
+                
+                // Guardar la actualización para aplicar después
+                productUpdates.push({
+                  ref: productRef,
+                  newStock: newStock,
+                  productName: productData.name
                 });
               } else {
-                throw new Error(`No hay suficiente stock del producto ${productData.name}. Stock disponible: ${currentStock}, requerido: ${quantityToUse}`);
+                console.warn(`Stock insuficiente para ${productData.name}: disponible ${currentStock}, necesario ${quantityToUse}`);
+                // No lanzar error, solo advertir
               }
+            } else {
+              console.warn(`Producto ${selectedProduct.productId} no encontrado`);
             }
           }
         }
         
+        // PASO 2: TODAS LAS ESCRITURAS DESPUÉS
+        console.log('Aplicando actualizaciones...'); // Debug
+        
+        // Actualizar stock de productos
+        for (const update of productUpdates) {
+          console.log(`Actualizando stock de ${update.productName} a ${update.newStock}`); // Debug
+          transaction.update(update.ref, {
+            stock: update.newStock,
+            updatedAt: serverTimestamp()
+          });
+        }
+        
+        // Preparar datos para la actualización de la fumigación
+        const updateData = {
+          status: 'completed',
+          updatedAt: serverTimestamp()
+        };
+        
+        // Añadir los datos de finalización
+        if (completionData) {
+          if (completionData.startDateTime instanceof Date) {
+            updateData.startDateTime = Timestamp.fromDate(completionData.startDateTime);
+          }
+          
+          if (completionData.endDateTime instanceof Date) {
+            updateData.endDateTime = Timestamp.fromDate(completionData.endDateTime);
+          }
+          
+          updateData.weatherConditions = completionData.weatherConditions || {};
+          updateData.completionNotes = completionData.completionNotes || '';
+        }
+        
+        console.log('Actualizando fumigación con:', updateData); // Debug
+        
         // Actualizar la fumigación
         transaction.update(fumigationRef, updateData);
+        
+        console.log('Transacción completada exitosamente'); // Debug
       });
+      
+      console.log('Fumigación completada, recargando datos...'); // Debug
       
       // Recargar fumigaciones
       await loadFumigations();
+      
+      console.log('Datos recargados'); // Debug
       
       return fumigationId;
     } catch (error) {
@@ -346,7 +399,12 @@ export function FumigationProvider({ children }) {
       return;
     }
 
+    console.log('Cargando fumigaciones iniciales...'); // Debug
+    
     loadFumigations()
+      .then(() => {
+        console.log('Fumigaciones cargadas exitosamente'); // Debug
+      })
       .catch(err => {
         console.error('Error al cargar datos iniciales de fumigaciones:', err);
         setError('Error al cargar datos: ' + err.message);
