@@ -1,15 +1,15 @@
 // src/controllers/DashboardController.js - Controlador corregido del Dashboard
 import { useState, useEffect, useCallback } from 'react';
 import { useStock } from '../contexts/StockContext';
-import { useHarvests } from '../contexts/HarvestContext'; 
+import { useHarvests } from '../contexts/HarvestContext';
+import { useFumigations } from '../contexts/FumigationContext';
+import { useTransfers } from '../contexts/TransferContext';
 
 // Controlador del Dashboard (lógica separada de la presentación)
 const useDashboardController = () => {
   const { 
-    products = [], // CORREGIDO: Valor por defecto como array vacío
-    warehouses = [], // CORREGIDO: Valor por defecto como array vacío
-    transfers = [], // CORREGIDO: Valor por defecto como array vacío
-    fumigations = [], // CORREGIDO: Valor por defecto como array vacío
+    products = [], 
+    warehouses = [], 
     loading: stockLoading, 
     error: stockError, 
     loadProducts,
@@ -17,11 +17,25 @@ const useDashboardController = () => {
   } = useStock();
   
   const {
-    harvests = [], // CORREGIDO: Valor por defecto como array vacío
+    harvests = [],
     loading: harvestsLoading,
     error: harvestsError,
     loadHarvests
-  } = useHarvests(); // Usar el contexto de cosechas
+  } = useHarvests();
+
+  const {
+    fumigations = [],
+    loading: fumigationsLoading,
+    error: fumigationsError,
+    loadFumigations
+  } = useFumigations();
+
+  const {
+    transfers = [],
+    loading: transfersLoading,
+    error: transfersError,
+    loadTransfers
+  } = useTransfers();
   
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -42,12 +56,12 @@ const useDashboardController = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // CORREGIDO: Calcular estadísticas y listas filtradas con verificación de arrays
+  // Calcular estadísticas y listas filtradas con verificación de arrays
   const processData = useCallback(() => {
     console.log('Procesando datos del dashboard...'); // Debug
     console.log('Productos disponibles:', Array.isArray(products) ? products.length : 0); // Debug
     
-    // CORREGIDO: Verificar que products sea un array antes de usar filter
+    // Verificar que products sea un array antes de usar filter
     if (!Array.isArray(products)) {
       console.warn('Products no es un array:', products);
       setLowStockProducts([]);
@@ -56,9 +70,8 @@ const useDashboardController = () => {
       return;
     }
     
-    // Calcular productos con stock bajo - CORREGIDO
+    // Calcular productos con stock bajo
     const lowStock = products.filter(product => {
-      // Usar directamente el campo 'stock' del producto
       const currentStock = product.stock || 0;
       const minStock = product.minStock || 0;
       
@@ -83,10 +96,10 @@ const useDashboardController = () => {
       })
       .slice(0, 5);
     
-    // CORREGIDO: Obtener transferencias pendientes con verificación de array
+    // Obtener transferencias pendientes con verificación de array
     const pendingTransfs = Array.isArray(transfers) 
       ? transfers
-          .filter(transfer => transfer.status === 'pending')
+          .filter(transfer => transfer.status === 'pending' || transfer.status === 'approved' || transfer.status === 'shipped')
           .map(transfer => ({
             ...transfer,
             sourceWarehouseName: getWarehouseName(transfer.sourceWarehouseId),
@@ -95,14 +108,14 @@ const useDashboardController = () => {
           .slice(0, 5)
       : [];
     
-    // CORREGIDO: Obtener fumigaciones pendientes con verificación de array
+    // Obtener fumigaciones pendientes con verificación de array
     const pendingFumigs = Array.isArray(fumigations)
       ? fumigations
           .filter(fumigation => fumigation.status === 'pending' || fumigation.status === 'scheduled')
           .slice(0, 5)
       : [];
     
-    // CORREGIDO: Obtener cosechas próximas con verificación de array
+    // Obtener cosechas próximas con verificación de array
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(currentDate.getDate() + 90);
     
@@ -123,7 +136,7 @@ const useDashboardController = () => {
           .slice(0, 5)
       : [];
     
-    // CORREGIDO: Generar actividades recientes con verificación de arrays
+    // Generar actividades recientes con verificación de arrays
     const allActivities = [];
     
     if (Array.isArray(transfers)) {
@@ -141,7 +154,7 @@ const useDashboardController = () => {
         type: 'fumigation',
         id: fumigation.id,
         date: fumigation.updatedAt ? new Date(fumigation.updatedAt.seconds * 1000) : new Date(),
-        description: `Fumigación en ${fumigation.establishment} (${fumigation.surface} ha)`,
+        description: `Fumigación en ${fumigation.establishment} (${fumigation.totalSurface} ha)`,
         status: fumigation.status
       })));
     }
@@ -183,12 +196,13 @@ const useDashboardController = () => {
     console.log('Estadísticas actualizadas:', {
       totalProducts: products.length,
       lowStockCount: lowStock.length,
-      expiringCount: expiringSoon.length
+      expiringCount: expiringSoon.length,
+      pendingTransfersCount: pendingTransfs.length
     }); // Debug
     
   }, [products, warehouses, transfers, fumigations, harvests]);
   
-  // CORREGIDO: Función para obtener el nombre de un almacén por ID con verificación de array
+  // Función para obtener el nombre de un almacén por ID con verificación de array
   const getWarehouseName = (warehouseId) => {
     if (!Array.isArray(warehouses) || !warehouseId) {
       return 'Almacén desconocido';
@@ -200,16 +214,21 @@ const useDashboardController = () => {
   
   // Evaluar y establecer estados de carga y error
   useEffect(() => {
-    setLoading(stockLoading || harvestsLoading);
+    const isLoading = stockLoading || harvestsLoading || fumigationsLoading || transfersLoading;
+    setLoading(isLoading);
     
     if (stockError) {
       setError(stockError);
     } else if (harvestsError) {
       setError(harvestsError);
+    } else if (fumigationsError) {
+      setError(fumigationsError);
+    } else if (transfersError) {
+      setError(transfersError);
     } else {
       setError('');
     }
-  }, [stockLoading, harvestsLoading, stockError, harvestsError]);
+  }, [stockLoading, harvestsLoading, fumigationsLoading, transfersLoading, stockError, harvestsError, fumigationsError, transfersError]);
   
   // Cargar datos cuando cambien las dependencias
   useEffect(() => {
@@ -225,13 +244,15 @@ const useDashboardController = () => {
       await Promise.all([
         loadProducts(),
         loadWarehouses(),
-        loadHarvests()
+        loadHarvests(),
+        loadFumigations(),
+        loadTransfers()
       ]);
     } catch (err) {
       console.error('Error al recargar datos:', err);
       setError('Error al cargar datos: ' + err.message);
     }
-  }, [loadProducts, loadWarehouses, loadHarvests]);
+  }, [loadProducts, loadWarehouses, loadHarvests, loadFumigations, loadTransfers]);
   
   // Cargar datos al montar el componente
   useEffect(() => {
