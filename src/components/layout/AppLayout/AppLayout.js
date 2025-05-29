@@ -9,11 +9,12 @@ const routeTitles = {
   '/dashboard': 'Panel Principal',
   '/productos': 'Productos',
   '/transferencias': 'Transferencias',
+  '/compras': 'Compras',
   '/fumigaciones': 'Fumigaciones',
   '/campos': 'Campos',
   '/almacenes': 'Almacenes',
   '/usuarios': 'Usuarios',
-  '/cosechas': 'Cosechas'  // Nueva ruta
+  '/cosechas': 'Cosechas'
 };
 
 const AppLayout = () => {

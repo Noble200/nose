@@ -28,6 +28,12 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
       permission: 'transfers'
     },
     { 
+      text: 'Compras', 
+      icon: 'fas fa-shopping-cart', 
+      path: '/compras',
+      permission: 'purchases'
+    },
+    { 
       text: 'Fumigaciones', 
       icon: 'fas fa-spray-can', 
       path: '/fumigaciones',
@@ -67,15 +73,15 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
     },
     {
       title: 'Inventario',
-      options: [menuOptions[1], menuOptions[2]] // Productos y Transferencias
+      options: [menuOptions[1], menuOptions[2], menuOptions[3]] // Productos, Transferencias y Compras
     },
     {
       title: 'Producción',
-      options: [menuOptions[3], menuOptions[4], menuOptions[5]] // Fumigaciones, Cosechas y Campos
+      options: [menuOptions[4], menuOptions[5], menuOptions[6]] // Fumigaciones, Cosechas y Campos
     },
     {
       title: 'Administración',
-      options: [menuOptions[6], menuOptions[7]] // Almacenes y Usuarios
+      options: [menuOptions[7], menuOptions[8]] // Almacenes y Usuarios
     }
   ];
 
