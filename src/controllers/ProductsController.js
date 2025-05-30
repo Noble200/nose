@@ -24,11 +24,39 @@ const useProductsController = () => {
     category: 'all',
     stockStatus: 'all',
     fieldId: 'all',
+    expiringSoon: false, // NUEVO: filtro para productos próximos a vencer
     searchTerm: ''
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filteredProductsList, setFilteredProductsList] = useState([]);
+
+  // NUEVO: Effect para manejar filtros desde URL
+  useEffect(() => {
+    // Leer parámetros de consulta de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const filterParam = urlParams.get('filter');
+    
+    if (filterParam === 'stock-low') {
+      // Aplicar filtro de stock bajo
+      setFilters(prev => ({
+        ...prev,
+        stockStatus: 'low'
+      }));
+    } else if (filterParam === 'expiring-soon') {
+      // Aplicar filtro de productos próximos a vencer
+      setFilters(prev => ({
+        ...prev,
+        expiringSoon: true
+      }));
+    }
+    
+    // Limpiar el parámetro de la URL después de aplicarlo
+    if (filterParam) {
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   // Función para añadir un producto
   const addProduct = useCallback(async (productData) => {
@@ -203,7 +231,7 @@ const useProductsController = () => {
     return 'ok';
   };
 
-  // Filtrar productos según filtros aplicados
+  // ACTUALIZADO: Filtrar productos según filtros aplicados incluyendo el nuevo filtro expiringSoon
   const getFilteredProducts = useCallback(() => {
     if (!products || products.length === 0) return [];
     
@@ -217,6 +245,21 @@ const useProductsController = () => {
       if (filters.stockStatus !== 'all') {
         const stockStatus = getStockStatus(product);
         if (filters.stockStatus !== stockStatus) {
+          return false;
+        }
+      }
+      
+      // NUEVO: Filtro por productos próximos a vencer (próximos 30 días)
+      if (filters.expiringSoon) {
+        const currentDate = new Date();
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(currentDate.getDate() + 30);
+        
+        const expiryDate = product.expiryDate 
+          ? new Date(product.expiryDate.seconds ? product.expiryDate.seconds * 1000 : product.expiryDate) 
+          : null;
+          
+        if (!expiryDate || expiryDate <= currentDate || expiryDate > thirtyDaysFromNow) {
           return false;
         }
       }
@@ -296,6 +339,7 @@ const useProductsController = () => {
       };
       
       console.log('handleSaveProduct - Datos procesados:', processedData); // Debug
+      console.log('handleSaveProduct - Stock convertido:', processedData.stock, typeof processedData.stock); // Debug
       
       if (dialogType === 'add-product') {
         // Crear nuevo producto
@@ -315,19 +359,26 @@ const useProductsController = () => {
     }
   }, [dialogType, selectedProduct, addProduct, updateProduct, loadProducts]);
 
-  // Cambiar filtros
+  // ACTUALIZADO: Cambiar filtros - incluyendo manejo del nuevo filtro
   const handleFilterChange = useCallback((filterName, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [filterName]: value
-    }));
+    setFilters(prev => {
+      const newFilters = { ...prev, [filterName]: value };
+      
+      // Si se selecciona un filtro específico, limpiar el filtro expiringSoon
+      if (filterName === 'stockStatus' || filterName === 'category') {
+        newFilters.expiringSoon = false;
+      }
+      
+      return newFilters;
+    });
   }, []);
 
   // Buscar por texto
   const handleSearch = useCallback((searchTerm) => {
     setFilters(prev => ({
       ...prev,
-      searchTerm
+      searchTerm,
+      expiringSoon: false // Limpiar filtro especial al buscar
     }));
   }, []);
 
@@ -337,7 +388,7 @@ const useProductsController = () => {
     setSelectedProduct(null);
   }, []);
 
-  // Opciones para filtros
+  // ACTUALIZADO: Opciones para filtros - agregando información sobre filtros especiales
   const filterOptions = {
     categories: [
       { value: 'all', label: 'Todas las categorías' },
@@ -359,6 +410,15 @@ const useProductsController = () => {
     ]
   };
 
+  // NUEVO: Función para limpiar filtros especiales
+  const clearSpecialFilters = useCallback(() => {
+    setFilters(prev => ({
+      ...prev,
+      expiringSoon: false,
+      stockStatus: 'all'
+    }));
+  }, []);
+
   return {
     products: filteredProductsList,
     fields,
@@ -369,6 +429,7 @@ const useProductsController = () => {
     dialogOpen,
     dialogType,
     filterOptions,
+    filters, // NUEVO: exponer filters para mostrar filtros activos
     handleAddProduct,
     handleEditProduct,
     handleViewProduct,
@@ -377,6 +438,7 @@ const useProductsController = () => {
     handleFilterChange,
     handleSearch,
     handleCloseDialog,
+    clearSpecialFilters, // NUEVO: función para limpiar filtros especiales
     refreshData: loadData
   };
 };

@@ -686,3 +686,243 @@
     height: 32px;
   }
 }
+
+/* Contenedor de filtros activos */
+.active-filters-container {
+  background-color: var(--primary-bg);
+  border: 1px solid var(--primary);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.active-filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.active-filters-header h4 {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary);
+  margin: 0;
+}
+
+.active-filters-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background-color: var(--primary);
+  color: var(--text-white);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.filter-chip i {
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .active-filters-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+  
+  .active-filters-list {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Estilos para filtros activos */
+.active-filters-container {
+  background-color: var(--primary-bg);
+  border: 1px solid var(--primary);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.active-filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.active-filters-header h4 {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary);
+  margin: 0;
+}
+
+.active-filters-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background-color: var(--primary);
+  color: var(--text-white);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.filter-chip i {
+  font-size: 12px;
+}
+
+/* Estilos mejorados para fecha de vencimiento */
+.expiry-date {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+.expiry-days {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  padding: 2px 6px;
+  border-radius: var(--border-radius-sm);
+  text-align: center;
+}
+
+.expiry-days.expired {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: var(--danger);
+}
+
+.expiry-days.urgent {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: var(--danger);
+}
+
+.expiry-days.warning {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: var(--warning);
+}
+
+.expiry-days.attention {
+  background-color: rgba(255, 193, 7, 0.1);
+  color: #FFC107;
+}
+
+.expiry-days.normal {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: var(--success);
+}
+
+/* Estados vacíos mejorados */
+.empty-state .empty-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  text-align: center;
+}
+
+.empty-state .empty-description {
+  font-size: var(--font-size-md);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
+  max-width: 500px;
+  text-align: center;
+}
+
+/* Responsive para filtros activos */
+@media (max-width: 768px) {
+  .active-filters-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+  
+  .active-filters-header .btn {
+    align-self: flex-end;
+  }
+  
+  .active-filters-list {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .filter-chip {
+    width: fit-content;
+  }
+}
+
+/* Mejoras para la tabla responsive */
+@media (max-width: 768px) {
+  .expiry-date {
+    font-size: var(--font-size-xs);
+  }
+  
+  .expiry-days {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+}
+
+/* Hover effects mejorados para filtros */
+.filter-chip:hover {
+  background-color: var(--primary-dark);
+  transition: background-color var(--transition-fast);
+}
+
+/* Estilos para botones en estado vacío */
+.empty-state .btn {
+  margin: var(--spacing-xs);
+}
+
+/* Animación suave para cambios de filtro */
+.products-table tbody tr {
+  transition: all var(--transition-fast);
+}
+
+.products-table tbody tr.filtered-out {
+  opacity: 0;
+  transform: translateY(-10px);
+}

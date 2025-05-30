@@ -6,6 +6,7 @@ import { HarvestProvider } from './contexts/HarvestContext';
 import { FumigationProvider } from './contexts/FumigationContext';
 import { TransferProvider } from './contexts/TransferContext';
 import { PurchaseProvider } from './contexts/PurchaseContext';
+import { ExpenseProvider } from './contexts/ExpenseContext'; // NUEVO
 import PrivateRoute from './components/ui/PrivateRoute';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import AppLayout from './components/layout/AppLayout/AppLayout';
@@ -19,6 +20,7 @@ import Warehouses from './pages/Warehouses';
 import Users from './pages/Users';
 import Harvests from './pages/Harvests';
 import Purchases from './pages/Purchases';
+import Expenses from './pages/Expenses'; // NUEVO
 import './App.css';
 
 function App() {
@@ -31,31 +33,34 @@ function App() {
               <FumigationProvider>
                 <TransferProvider>
                   <PurchaseProvider>
-                    <Routes>
-                      {/* Ruta pública */}
-                      <Route path="/login" element={<Login />} />
-                      
-                      {/* Rutas protegidas */}
-                      <Route path="/" element={
-                        <PrivateRoute>
-                          <AppLayout />
-                        </PrivateRoute>
-                      }>
-                        <Route index element={<Navigate to="/dashboard" replace />} />
-                        <Route path="dashboard" element={<Dashboard />} />
-                        <Route path="productos" element={<Products />} />
-                        <Route path="transferencias" element={<Transfers />} />
-                        <Route path="compras" element={<Purchases />} />
-                        <Route path="fumigaciones" element={<Fumigations />} />
-                        <Route path="campos" element={<Fields />} />
-                        <Route path="almacenes" element={<Warehouses />} />
-                        <Route path="usuarios" element={<Users />} />
-                        <Route path="cosechas" element={<Harvests />} />
-                      </Route>
-                      
-                      {/* Redirección para rutas no encontradas */}
-                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                    </Routes>
+                    <ExpenseProvider> {/* NUEVO PROVIDER */}
+                      <Routes>
+                        {/* Ruta pública */}
+                        <Route path="/login" element={<Login />} />
+                        
+                        {/* Rutas protegidas */}
+                        <Route path="/" element={
+                          <PrivateRoute>
+                            <AppLayout />
+                          </PrivateRoute>
+                        }>
+                          <Route index element={<Navigate to="/dashboard" replace />} />
+                          <Route path="dashboard" element={<Dashboard />} />
+                          <Route path="productos" element={<Products />} />
+                          <Route path="transferencias" element={<Transfers />} />
+                          <Route path="compras" element={<Purchases />} />
+                          <Route path="gastos" element={<Expenses />} /> {/* NUEVA RUTA */}
+                          <Route path="fumigaciones" element={<Fumigations />} />
+                          <Route path="campos" element={<Fields />} />
+                          <Route path="almacenes" element={<Warehouses />} />
+                          <Route path="usuarios" element={<Users />} />
+                          <Route path="cosechas" element={<Harvests />} />
+                        </Route>
+                        
+                        {/* Redirección para rutas no encontradas */}
+                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                      </Routes>
+                    </ExpenseProvider>
                   </PurchaseProvider>
                 </TransferProvider>
               </FumigationProvider>

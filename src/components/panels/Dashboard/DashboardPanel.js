@@ -49,6 +49,10 @@ const DashboardPanel = ({
         chipClass = 'chip-warning';
         statusText = 'Pendiente';
         break;
+      case 'scheduled':
+        chipClass = 'chip-info';
+        statusText = 'Programada';
+        break;
       case 'in_progress':
         chipClass = 'chip-info';
         statusText = 'En Proceso';
@@ -61,16 +65,22 @@ const DashboardPanel = ({
         chipClass = 'chip-danger';
         statusText = 'Cancelado';
         break;
-      case 'scheduled':
-        chipClass = 'chip-primary';
-        statusText = 'Programado';
-        break;
       default:
         chipClass = 'chip-primary';
         statusText = status;
     }
 
     return <span className={`chip ${chipClass}`}>{statusText}</span>;
+  };
+
+  // Función para obtener días hasta una fecha
+  const getDaysUntil = (date) => {
+    if (!date) return null;
+    const targetDate = new Date(date);
+    const today = new Date();
+    const diffTime = targetDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
   };
 
   // Render loading state
@@ -174,7 +184,7 @@ const DashboardPanel = ({
             {lowStockProducts.length > 0 ? (
               <ul className="item-list">
                 {lowStockProducts.map((product) => {
-                  const totalStock = Object.values(product.warehouseStock || {}).reduce((sum, stock) => sum + stock, 0);
+                  const currentStock = product.stock || 0;
                   return (
                     <li key={product.id} className="list-item">
                       <div className="list-item-title">
@@ -183,11 +193,11 @@ const DashboardPanel = ({
                       <div className="list-item-subtitle">
                         <span>
                           <i className="fas fa-box"></i>
-                          Stock actual: {totalStock} {product.unitOfMeasure}
+                          Stock actual: {currentStock} {product.unit}
                         </span>
                         <span>
                           <i className="fas fa-arrow-down"></i>
-                          Mínimo: {product.minStock} {product.unitOfMeasure}
+                          Mínimo: {product.minStock} {product.unit}
                         </span>
                       </div>
                     </li>
@@ -202,8 +212,11 @@ const DashboardPanel = ({
             )}
           </div>
           <div className="panel-footer">
-            <Link to="/productos" className="btn btn-outline">
-              Ver todos los productos
+            <Link 
+              to="/productos?filter=stock-low" 
+              className="btn btn-outline"
+            >
+              Ver productos con stock bajo
             </Link>
           </div>
         </div>
@@ -223,10 +236,19 @@ const DashboardPanel = ({
                   const expiryDate = product.expiryDate 
                     ? formatDate(product.expiryDate.seconds ? new Date(product.expiryDate.seconds * 1000) : product.expiryDate) 
                     : 'Sin fecha';
+                  const daysUntilExpiry = product.expiryDate 
+                    ? getDaysUntil(product.expiryDate.seconds ? new Date(product.expiryDate.seconds * 1000) : product.expiryDate)
+                    : null;
+                  
                   return (
                     <li key={product.id} className="list-item">
                       <div className="list-item-title">
                         {product.name}
+                        {daysUntilExpiry !== null && (
+                          <span className={`chip ${daysUntilExpiry <= 7 ? 'chip-danger' : daysUntilExpiry <= 15 ? 'chip-warning' : 'chip-info'}`}>
+                            {daysUntilExpiry > 0 ? `${daysUntilExpiry} días` : 'Vencido'}
+                          </span>
+                        )}
                       </div>
                       <div className="list-item-subtitle">
                         <span>
@@ -252,8 +274,11 @@ const DashboardPanel = ({
             )}
           </div>
           <div className="panel-footer">
-            <Link to="/productos" className="btn btn-outline">
-              Ver todos los productos
+            <Link 
+              to="/productos?filter=expiring-soon" 
+              className="btn btn-outline"
+            >
+              Ver productos próximos a vencer
             </Link>
           </div>
         </div>
@@ -272,28 +297,43 @@ const DashboardPanel = ({
           <div className="panel-content">
             {pendingFumigations && pendingFumigations.length > 0 ? (
               <ul className="item-list">
-                {pendingFumigations.map((fumigation) => (
-                  <li key={fumigation.id} className="list-item">
-                    <div className="list-item-title">
-                      {fumigation.establishment} - Lote: {fumigation.lot}
-                      {renderStatusChip(fumigation.status)}
-                    </div>
-                    <div className="list-item-subtitle">
-                      <span>
-                        <i className="fas fa-calendar"></i>
-                        Fecha: {formatDate(fumigation.date)}
-                      </span>
-                      <span>
-                        <i className="fas fa-seedling"></i>
-                        Cultivo: {fumigation.crop}
-                      </span>
-                      <span>
-                        <i className="fas fa-ruler-combined"></i>
-                        Superficie: {fumigation.surface} ha
-                      </span>
-                    </div>
-                  </li>
-                ))}
+                {pendingFumigations.map((fumigation) => {
+                  const applicationDate = fumigation.applicationDate 
+                    ? new Date(fumigation.applicationDate.seconds ? fumigation.applicationDate.seconds * 1000 : fumigation.applicationDate)
+                    : null;
+                  const daysUntil = applicationDate ? getDaysUntil(applicationDate) : null;
+                  
+                  return (
+                    <li key={fumigation.id} className="list-item">
+                      <div className="list-item-title">
+                        {fumigation.establishment} - {fumigation.crop}
+                        {renderStatusChip(fumigation.status)}
+                      </div>
+                      <div className="list-item-subtitle">
+                        <span>
+                          <i className="fas fa-calendar"></i>
+                          Fecha programada: {applicationDate ? formatDate(applicationDate) : 'Sin fecha'}
+                        </span>
+                        {daysUntil !== null && (
+                          <span>
+                            <i className="fas fa-clock"></i>
+                            {daysUntil > 0 ? `En ${daysUntil} días` : daysUntil === 0 ? 'Hoy' : `${Math.abs(daysUntil)} días atrasado`}
+                          </span>
+                        )}
+                        <span>
+                          <i className="fas fa-ruler-combined"></i>
+                          Superficie: {fumigation.totalSurface} ha
+                        </span>
+                        {fumigation.applicator && (
+                          <span>
+                            <i className="fas fa-user"></i>
+                            Aplicador: {fumigation.applicator}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <div className="list-empty">
@@ -303,8 +343,8 @@ const DashboardPanel = ({
             )}
           </div>
           <div className="panel-footer">
-            <Link to="/fumigaciones" className="btn btn-outline">
-              Ver todas las fumigaciones
+            <Link to="/fumigaciones?filter=pending" className="btn btn-outline">
+              Ver todas las fumigaciones pendientes
             </Link>
           </div>
         </div>
@@ -320,34 +360,43 @@ const DashboardPanel = ({
           <div className="panel-content">
             {upcomingHarvests && upcomingHarvests.length > 0 ? (
               <ul className="item-list">
-                {upcomingHarvests.map((harvest) => (
-                  <li key={harvest.id} className="list-item">
-                    <div className="list-item-title">
-                      {harvest.establishment} - Lote: {harvest.lot}
-                      {renderStatusChip(harvest.status)}
-                    </div>
-                    <div className="list-item-subtitle">
-                      <span>
-                        <i className="fas fa-calendar"></i>
-                        Fecha planificada: {formatDate(harvest.plannedDate)}
-                      </span>
-                      <span>
-                        <i className="fas fa-seedling"></i>
-                        Cultivo: {harvest.crop}
-                      </span>
-                      <span>
-                        <i className="fas fa-ruler-combined"></i>
-                        Superficie: {harvest.surface} ha
-                      </span>
-                      {harvest.estimatedYield && (
+                {upcomingHarvests.map((harvest) => {
+                  const plannedDate = harvest.plannedDate 
+                    ? new Date(harvest.plannedDate.seconds ? harvest.plannedDate.seconds * 1000 : harvest.plannedDate)
+                    : null;
+                  const daysUntil = plannedDate ? getDaysUntil(plannedDate) : null;
+                  
+                  return (
+                    <li key={harvest.id} className="list-item">
+                      <div className="list-item-title">
+                        {harvest.field?.name || 'Campo'} - {harvest.crop}
+                        {renderStatusChip(harvest.status)}
+                      </div>
+                      <div className="list-item-subtitle">
                         <span>
-                          <i className="fas fa-balance-scale"></i>
-                          Rendimiento est.: {harvest.estimatedYield} {harvest.yieldUnit}/ha
+                          <i className="fas fa-calendar"></i>
+                          Fecha planificada: {plannedDate ? formatDate(plannedDate) : 'Sin fecha'}
                         </span>
-                      )}
-                    </div>
-                  </li>
-                ))}
+                        {daysUntil !== null && (
+                          <span>
+                            <i className="fas fa-clock"></i>
+                            {daysUntil > 0 ? `En ${daysUntil} días` : daysUntil === 0 ? 'Hoy' : `${Math.abs(daysUntil)} días atrasado`}
+                          </span>
+                        )}
+                        <span>
+                          <i className="fas fa-ruler-combined"></i>
+                          Superficie: {harvest.totalArea || 0} {harvest.areaUnit || 'ha'}
+                        </span>
+                        {harvest.estimatedYield && (
+                          <span>
+                            <i className="fas fa-balance-scale"></i>
+                            Rendimiento est.: {harvest.estimatedYield} {harvest.yieldUnit || 'kg/ha'}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <div className="list-empty">
@@ -357,8 +406,8 @@ const DashboardPanel = ({
             )}
           </div>
           <div className="panel-footer">
-            <Link to="/cosechas" className="btn btn-outline">
-              Ver todas las cosechas
+            <Link to="/cosechas?filter=upcoming" className="btn btn-outline">
+              Ver todas las cosechas próximas
             </Link>
           </div>
         </div>

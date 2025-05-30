@@ -15,6 +15,7 @@ const Products = () => {
     dialogOpen,
     dialogType,
     filterOptions,
+    filters, // NUEVO
     handleAddProduct,
     handleEditProduct,
     handleViewProduct,
@@ -23,6 +24,7 @@ const Products = () => {
     handleFilterChange,
     handleSearch,
     handleCloseDialog,
+    clearSpecialFilters, // NUEVO
     refreshData
   } = useProductsController();
 
@@ -38,6 +40,7 @@ const Products = () => {
       dialogOpen={dialogOpen}
       dialogType={dialogType}
       filterOptions={filterOptions}
+      filters={filters} // NUEVO
       onAddProduct={handleAddProduct}
       onEditProduct={handleEditProduct}
       onViewProduct={handleViewProduct}
@@ -47,6 +50,7 @@ const Products = () => {
       onSearch={handleSearch}
       onCloseDialog={handleCloseDialog}
       onRefresh={refreshData}
+      clearSpecialFilters={clearSpecialFilters} // NUEVO
     />
   );
 };

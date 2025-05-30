@@ -449,3 +449,138 @@
     padding: var(--spacing-md);
   }
 }
+
+/* Chips de días hasta vencimiento/fecha */
+.list-item-title .chip {
+  margin-left: var(--spacing-sm);
+}
+
+/* Chips con colores específicos para días */
+.chip-danger {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: var(--danger);
+}
+
+.chip-warning {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: var(--warning);
+}
+
+.chip-info {
+  background-color: rgba(33, 150, 243, 0.1);
+  color: var(--info);
+}
+
+.chip-success {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: var(--success);
+}
+
+.chip-primary {
+  background-color: var(--primary-bg);
+  color: var(--primary);
+}
+
+/* Mejorar la visualización de fechas en elementos de lista */
+.list-item-subtitle span {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.list-item-subtitle span i {
+  margin-right: var(--spacing-xs);
+  font-size: 14px;
+  color: var(--gray-500);
+  min-width: 16px;
+}
+
+/* Espaciado mejorado para elementos con muchos datos */
+.list-item-subtitle {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+
+/* Estilos para indicadores de tiempo */
+.time-indicator {
+  font-weight: var(--font-weight-medium);
+}
+
+.time-indicator.urgent {
+  color: var(--danger);
+}
+
+.time-indicator.warning {
+  color: var(--warning);
+}
+
+.time-indicator.normal {
+  color: var(--info);
+}
+
+/* Botones de panel footer mejorados */
+.panel-footer .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Hover effects para elementos de lista */
+.list-item:hover {
+  background-color: var(--gray-50);
+  transform: translateX(2px);
+  transition: all var(--transition-fast);
+}
+
+/* Responsive para chips en móviles */
+@media (max-width: 768px) {
+  .list-item-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+  
+  .list-item-title .chip {
+    margin-left: 0;
+    margin-top: var(--spacing-xs);
+  }
+  
+  .list-item-subtitle {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-xs);
+  }
+}
+
+/* Estilos para actividades recientes mejoradas */
+.activity-content .activity-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.activity-description {
+  flex: 1;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.activity-details {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* Mejoras para estadísticas */
+.stat-value {
+  font-size: var(--font-size-xxxl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin: 0 0 var(--spacing-xs) 0;
+  line-height: 1.2;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+}

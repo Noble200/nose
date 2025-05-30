@@ -82,7 +82,7 @@ const useDashboardController = () => {
     
     console.log('Productos con stock bajo encontrados:', lowStock.length); // Debug
     
-    // Calcular productos próximos a vencer
+    // Calcular productos próximos a vencer (próximos 30 días)
     const currentDate = new Date();
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(currentDate.getDate() + 30);
@@ -93,6 +93,12 @@ const useDashboardController = () => {
           ? new Date(product.expiryDate.seconds ? product.expiryDate.seconds * 1000 : product.expiryDate) 
           : null;
         return expiryDate && expiryDate > currentDate && expiryDate < thirtyDaysFromNow;
+      })
+      .sort((a, b) => {
+        // Ordenar por fecha de vencimiento más próxima
+        const dateA = a.expiryDate.seconds ? a.expiryDate.seconds * 1000 : a.expiryDate;
+        const dateB = b.expiryDate.seconds ? b.expiryDate.seconds * 1000 : b.expiryDate;
+        return new Date(dateA) - new Date(dateB);
       })
       .slice(0, 5);
     
@@ -108,14 +114,26 @@ const useDashboardController = () => {
           .slice(0, 5)
       : [];
     
-    // Obtener fumigaciones pendientes con verificación de array
+    // MEJORADO: Obtener fumigaciones pendientes y programadas con fechas
     const pendingFumigs = Array.isArray(fumigations)
       ? fumigations
           .filter(fumigation => fumigation.status === 'pending' || fumigation.status === 'scheduled')
+          .sort((a, b) => {
+            // Ordenar por fecha de aplicación más próxima
+            const dateA = a.applicationDate 
+              ? (a.applicationDate.seconds ? a.applicationDate.seconds * 1000 : a.applicationDate)
+              : new Date().getTime() + 999999999; // Poner las sin fecha al final
+              
+            const dateB = b.applicationDate 
+              ? (b.applicationDate.seconds ? b.applicationDate.seconds * 1000 : b.applicationDate)
+              : new Date().getTime() + 999999999;
+              
+            return new Date(dateA) - new Date(dateB);
+          })
           .slice(0, 5)
       : [];
     
-    // Obtener cosechas próximas con verificación de array
+    // MEJORADO: Obtener cosechas próximas (próximos 90 días) con fechas
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(currentDate.getDate() + 90);
     
@@ -129,6 +147,7 @@ const useDashboardController = () => {
                    (harvest.status === 'pending' || harvest.status === 'scheduled');
           })
           .sort((a, b) => {
+            // Ordenar por fecha planificada más próxima
             const dateA = a.plannedDate.seconds ? a.plannedDate.seconds * 1000 : a.plannedDate;
             const dateB = b.plannedDate.seconds ? b.plannedDate.seconds * 1000 : b.plannedDate;
             return new Date(dateA) - new Date(dateB);
@@ -154,7 +173,7 @@ const useDashboardController = () => {
         type: 'fumigation',
         id: fumigation.id,
         date: fumigation.updatedAt ? new Date(fumigation.updatedAt.seconds * 1000) : new Date(),
-        description: `Fumigación en ${fumigation.establishment} (${fumigation.totalSurface} ha)`,
+        description: `Fumigación en ${fumigation.establishment} - ${fumigation.crop} (${fumigation.totalSurface || 0} ha)`,
         status: fumigation.status
       })));
     }
@@ -164,7 +183,7 @@ const useDashboardController = () => {
         type: 'harvest',
         id: harvest.id,
         date: harvest.updatedAt ? new Date(harvest.updatedAt.seconds * 1000) : new Date(),
-        description: `Cosecha de ${harvest.crop} en ${harvest.establishment || harvest.field?.name || 'Campo'} (${harvest.totalArea || 0} ha)`,
+        description: `Cosecha de ${harvest.crop || 'cultivo'} en ${harvest.field?.name || 'Campo'} (${harvest.totalArea || 0} ${harvest.areaUnit || 'ha'})`,
         status: harvest.status
       })));
     }
@@ -197,7 +216,9 @@ const useDashboardController = () => {
       totalProducts: products.length,
       lowStockCount: lowStock.length,
       expiringCount: expiringSoon.length,
-      pendingTransfersCount: pendingTransfs.length
+      pendingTransfersCount: pendingTransfs.length,
+      pendingFumigationsCount: pendingFumigs.length,
+      upcomingHarvestsCount: upcoming.length
     }); // Debug
     
   }, [products, warehouses, transfers, fumigations, harvests]);

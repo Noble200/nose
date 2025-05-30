@@ -28,6 +28,7 @@
 @import './components/panels/Fumigations/fumigations.css';
 @import './components/panels/Transfers/transfers.css';
 @import './components/panels/Purchases/purchases.css';
+@import './components/panels/Expenses/expenses.css'; /* NUEVO */
 
 /* Importar Font Awesome para iconos (CDN) */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');

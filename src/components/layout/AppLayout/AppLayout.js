@@ -10,6 +10,7 @@ const routeTitles = {
   '/productos': 'Productos',
   '/transferencias': 'Transferencias',
   '/compras': 'Compras',
+  '/gastos': 'Gastos', // NUEVO
   '/fumigaciones': 'Fumigaciones',
   '/campos': 'Campos',
   '/almacenes': 'Almacenes',
