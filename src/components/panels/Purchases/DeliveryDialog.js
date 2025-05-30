@@ -1,4 +1,4 @@
-// src/components/panels/Purchases/DeliveryDialog.js - Diálogo para crear entregas
+// src/components/panels/Purchases/DeliveryDialog.js - Diálogo para crear entregas - CORREGIDO
 import React, { useState, useEffect } from 'react';
 
 const DeliveryDialog = ({
@@ -13,12 +13,21 @@ const DeliveryDialog = ({
     warehouseName: '',
     deliveryDate: new Date().toISOString().split('T')[0],
     products: [],
-    freight: 0,
+    freight: '', // CORREGIDO: string vacío en lugar de 0
     notes: ''
   });
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // CORREGIDO: Función para convertir string a número de forma segura
+  const parseNumberValue = (value) => {
+    if (value === '' || value === null || value === undefined) {
+      return 0;
+    }
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
   // Inicializar productos disponibles para entrega
   useEffect(() => {
@@ -49,7 +58,7 @@ const DeliveryDialog = ({
           originalQuantity: product.quantity,
           deliveredQuantity: delivered,
           pendingQuantity: Math.max(0, pending),
-          selectedQuantity: 0
+          selectedQuantity: '' // CORREGIDO: string vacío en lugar de 0
         };
       }).filter(product => product.pendingQuantity > 0);
       
@@ -60,7 +69,7 @@ const DeliveryDialog = ({
     }
   }, [purchase]);
 
-  // Manejar cambios en el formulario
+  // Manejar cambios en el formulario - CORREGIDO
   const handleChange = (e) => {
     const { name, value, type } = e.target;
     
@@ -74,70 +83,87 @@ const DeliveryDialog = ({
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: type === 'number' ? parseFloat(value) || 0 : value
+        [name]: value // CORREGIDO: mantener como string para campos numéricos
       }));
     }
   };
 
-  // Manejar cambios en cantidades de productos
+  // Manejar cambios en cantidades de productos - CORREGIDO
   const handleProductQuantityChange = (index, quantity) => {
-    const numQuantity = parseFloat(quantity) || 0;
     const maxQuantity = formData.products[index].pendingQuantity;
     
-    // Limitar la cantidad a lo que está pendiente
+    // Si está vacío, permitir string vacío
+    if (quantity === '') {
+      setFormData(prev => ({
+        ...prev,
+        products: prev.products.map((product, i) => 
+          i === index 
+            ? { ...product, selectedQuantity: '' }
+            : product
+        )
+      }));
+      return;
+    }
+    
+    // Si no está vacío, parsearlo y limitar
+    const numQuantity = parseNumberValue(quantity);
     const finalQuantity = Math.min(numQuantity, maxQuantity);
     
     setFormData(prev => ({
       ...prev,
       products: prev.products.map((product, i) => 
         i === index 
-          ? { ...product, selectedQuantity: finalQuantity }
+          ? { ...product, selectedQuantity: finalQuantity.toString() }
           : product
       )
     }));
   };
 
-  // Seleccionar/deseleccionar todos los productos
+  // Seleccionar/deseleccionar todos los productos - CORREGIDO
   const handleSelectAll = (selectAll) => {
     setFormData(prev => ({
       ...prev,
       products: prev.products.map(product => ({
         ...product,
-        selectedQuantity: selectAll ? product.pendingQuantity : 0
+        selectedQuantity: selectAll ? product.pendingQuantity.toString() : ''
       }))
     }));
   };
 
-  // Obtener productos seleccionados para la entrega
+  // Obtener productos seleccionados para la entrega - CORREGIDO
   const getSelectedProducts = () => {
     return formData.products
-      .filter(product => product.selectedQuantity > 0)
+      .filter(product => {
+        const quantity = parseNumberValue(product.selectedQuantity);
+        return quantity > 0;
+      })
       .map(product => ({
         productId: product.productId,
         name: product.name,
         category: product.category,
         unit: product.unit,
-        quantity: product.selectedQuantity,
+        quantity: parseNumberValue(product.selectedQuantity),
         unitCost: product.unitCost
       }));
   };
 
-  // Calcular totales
+  // Calcular totales - CORREGIDO
   const calculateTotals = () => {
     const selectedProducts = getSelectedProducts();
     const totalProducts = selectedProducts.length;
     const totalQuantity = selectedProducts.reduce((sum, product) => sum + product.quantity, 0);
     const totalValue = selectedProducts.reduce((sum, product) => sum + (product.quantity * product.unitCost), 0);
+    const freight = parseNumberValue(formData.freight);
     
     return { 
       totalProducts, 
       totalQuantity, 
       totalValue,
-      totalWithFreight: totalValue + formData.freight 
+      totalWithFreight: totalValue + freight 
     };
   };
 
-  // Manejar envío del formulario
+  // Manejar envío del formulario - CORREGIDO
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -167,7 +193,7 @@ const DeliveryDialog = ({
         warehouseName: formData.warehouseName,
         deliveryDate: new Date(formData.deliveryDate),
         products: selectedProducts,
-        freight: formData.freight,
+        freight: parseNumberValue(formData.freight), // CORREGIDO: convertir a número
         notes: formData.notes
       };
       
@@ -332,9 +358,10 @@ const DeliveryDialog = ({
                           max={product.pendingQuantity}
                           step="0.01"
                           style={{ width: '120px' }}
+                          placeholder="0"
                         />
                       </td>
-                      <td>{formatCurrency(product.unitCost)}</td>
+                      <td>{formatCurrency(product.unitCost)}                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -368,7 +395,7 @@ const DeliveryDialog = ({
               </div>
               <div className="summary-row">
                 <span>Costo de flete:</span>
-                <span>{formatCurrency(formData.freight)}</span>
+                <span>{formatCurrency(parseNumberValue(formData.freight))}</span>
               </div>
               <div className="summary-row total">
                 <span>Total de entrega:</span>
