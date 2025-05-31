@@ -1,11 +1,11 @@
-// src/controllers/DashboardController.js - Controlador corregido del Dashboard
+// src/controllers/DashboardController.js - Controlador del Dashboard actualizado con actividades reales
 import { useState, useEffect, useCallback } from 'react';
 import { useStock } from '../contexts/StockContext';
 import { useHarvests } from '../contexts/HarvestContext';
 import { useFumigations } from '../contexts/FumigationContext';
 import { useTransfers } from '../contexts/TransferContext';
+import { useActivities } from '../contexts/ActivityContext'; // NUEVO
 
-// Controlador del Dashboard (lógica separada de la presentación)
 const useDashboardController = () => {
   const { 
     products = [], 
@@ -36,6 +36,13 @@ const useDashboardController = () => {
     error: transfersError,
     loadTransfers
   } = useTransfers();
+
+  // NUEVO: Usar actividades reales del contexto
+  const {
+    getRecentActivities,
+    loading: activitiesLoading,
+    error: activitiesError
+  } = useActivities();
   
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -59,7 +66,6 @@ const useDashboardController = () => {
   // Calcular estadísticas y listas filtradas con verificación de arrays
   const processData = useCallback(() => {
     console.log('Procesando datos del dashboard...'); // Debug
-    console.log('Productos disponibles:', Array.isArray(products) ? products.length : 0); // Debug
     
     // Verificar que products sea un array antes de usar filter
     if (!Array.isArray(products)) {
@@ -74,13 +80,8 @@ const useDashboardController = () => {
     const lowStock = products.filter(product => {
       const currentStock = product.stock || 0;
       const minStock = product.minStock || 0;
-      
-      console.log(`Producto: ${product.name}, Stock actual: ${currentStock}, Stock mínimo: ${minStock}`); // Debug
-      
       return currentStock <= minStock && minStock > 0;
     }).slice(0, 5);
-    
-    console.log('Productos con stock bajo encontrados:', lowStock.length); // Debug
     
     // Calcular productos próximos a vencer (próximos 30 días)
     const currentDate = new Date();
@@ -95,14 +96,13 @@ const useDashboardController = () => {
         return expiryDate && expiryDate > currentDate && expiryDate < thirtyDaysFromNow;
       })
       .sort((a, b) => {
-        // Ordenar por fecha de vencimiento más próxima
         const dateA = a.expiryDate.seconds ? a.expiryDate.seconds * 1000 : a.expiryDate;
         const dateB = b.expiryDate.seconds ? b.expiryDate.seconds * 1000 : b.expiryDate;
         return new Date(dateA) - new Date(dateB);
       })
       .slice(0, 5);
     
-    // Obtener transferencias pendientes con verificación de array
+    // Obtener transferencias pendientes
     const pendingTransfs = Array.isArray(transfers) 
       ? transfers
           .filter(transfer => transfer.status === 'pending' || transfer.status === 'approved' || transfer.status === 'shipped')
@@ -114,15 +114,14 @@ const useDashboardController = () => {
           .slice(0, 5)
       : [];
     
-    // MEJORADO: Obtener fumigaciones pendientes y programadas con fechas
+    // Obtener fumigaciones pendientes y programadas
     const pendingFumigs = Array.isArray(fumigations)
       ? fumigations
           .filter(fumigation => fumigation.status === 'pending' || fumigation.status === 'scheduled')
           .sort((a, b) => {
-            // Ordenar por fecha de aplicación más próxima
             const dateA = a.applicationDate 
               ? (a.applicationDate.seconds ? a.applicationDate.seconds * 1000 : a.applicationDate)
-              : new Date().getTime() + 999999999; // Poner las sin fecha al final
+              : new Date().getTime() + 999999999;
               
             const dateB = b.applicationDate 
               ? (b.applicationDate.seconds ? b.applicationDate.seconds * 1000 : b.applicationDate)
@@ -133,7 +132,7 @@ const useDashboardController = () => {
           .slice(0, 5)
       : [];
     
-    // MEJORADO: Obtener cosechas próximas (próximos 90 días) con fechas
+    // Obtener cosechas próximas (próximos 90 días)
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(currentDate.getDate() + 90);
     
@@ -147,7 +146,6 @@ const useDashboardController = () => {
                    (harvest.status === 'pending' || harvest.status === 'scheduled');
           })
           .sort((a, b) => {
-            // Ordenar por fecha planificada más próxima
             const dateA = a.plannedDate.seconds ? a.plannedDate.seconds * 1000 : a.plannedDate;
             const dateB = b.plannedDate.seconds ? b.plannedDate.seconds * 1000 : b.plannedDate;
             return new Date(dateA) - new Date(dateB);
@@ -155,43 +153,8 @@ const useDashboardController = () => {
           .slice(0, 5)
       : [];
     
-    // Generar actividades recientes con verificación de arrays
-    const allActivities = [];
-    
-    if (Array.isArray(transfers)) {
-      allActivities.push(...transfers.map(transfer => ({
-        type: 'transfer',
-        id: transfer.id,
-        date: transfer.updatedAt ? new Date(transfer.updatedAt.seconds * 1000) : new Date(),
-        description: `Transferencia de ${transfer.products?.length || 0} producto(s) de ${getWarehouseName(transfer.sourceWarehouseId)} a ${getWarehouseName(transfer.targetWarehouseId)}`,
-        status: transfer.status
-      })));
-    }
-    
-    if (Array.isArray(fumigations)) {
-      allActivities.push(...fumigations.map(fumigation => ({
-        type: 'fumigation',
-        id: fumigation.id,
-        date: fumigation.updatedAt ? new Date(fumigation.updatedAt.seconds * 1000) : new Date(),
-        description: `Fumigación en ${fumigation.establishment} - ${fumigation.crop} (${fumigation.totalSurface || 0} ha)`,
-        status: fumigation.status
-      })));
-    }
-    
-    if (Array.isArray(harvests)) {
-      allActivities.push(...harvests.map(harvest => ({
-        type: 'harvest',
-        id: harvest.id,
-        date: harvest.updatedAt ? new Date(harvest.updatedAt.seconds * 1000) : new Date(),
-        description: `Cosecha de ${harvest.crop || 'cultivo'} en ${harvest.field?.name || 'Campo'} (${harvest.totalArea || 0} ${harvest.areaUnit || 'ha'})`,
-        status: harvest.status
-      })));
-    }
-    
-    // Ordenar por fecha descendente y tomar los 10 más recientes
-    const recent = allActivities
-      .sort((a, b) => b.date - a.date)
-      .slice(0, 10);
+    // ACTUALIZADO: Usar actividades reales del contexto
+    const recent = getRecentActivities ? getRecentActivities() : [];
     
     // Actualizar estados
     setLowStockProducts(lowStock);
@@ -199,7 +162,7 @@ const useDashboardController = () => {
     setPendingTransfers(pendingTransfs);
     setPendingFumigations(pendingFumigs);
     setUpcomingHarvests(upcoming);
-    setRecentActivities(recent);
+    setRecentActivities(recent); // ACTUALIZADO: Usar actividades reales
     
     // Actualizar estadísticas
     setStats({
@@ -212,18 +175,9 @@ const useDashboardController = () => {
       upcomingHarvestsCount: upcoming.length
     });
     
-    console.log('Estadísticas actualizadas:', {
-      totalProducts: products.length,
-      lowStockCount: lowStock.length,
-      expiringCount: expiringSoon.length,
-      pendingTransfersCount: pendingTransfs.length,
-      pendingFumigationsCount: pendingFumigs.length,
-      upcomingHarvestsCount: upcoming.length
-    }); // Debug
-    
-  }, [products, warehouses, transfers, fumigations, harvests]);
+  }, [products, warehouses, transfers, fumigations, harvests, getRecentActivities]);
   
-  // Función para obtener el nombre de un almacén por ID con verificación de array
+  // Función para obtener el nombre de un almacén por ID
   const getWarehouseName = (warehouseId) => {
     if (!Array.isArray(warehouses) || !warehouseId) {
       return 'Almacén desconocido';
@@ -233,9 +187,10 @@ const useDashboardController = () => {
     return warehouse ? warehouse.name : 'Almacén desconocido';
   };
   
-  // Evaluar y establecer estados de carga y error
+  // ACTUALIZADO: Evaluar estados de carga y error incluyendo actividades
   useEffect(() => {
-    const isLoading = stockLoading || harvestsLoading || fumigationsLoading || transfersLoading;
+    const isLoading = stockLoading || harvestsLoading || fumigationsLoading || 
+                     transfersLoading || activitiesLoading;
     setLoading(isLoading);
     
     if (stockError) {
@@ -246,10 +201,13 @@ const useDashboardController = () => {
       setError(fumigationsError);
     } else if (transfersError) {
       setError(transfersError);
+    } else if (activitiesError) {
+      setError(activitiesError);
     } else {
       setError('');
     }
-  }, [stockLoading, harvestsLoading, fumigationsLoading, transfersLoading, stockError, harvestsError, fumigationsError, transfersError]);
+  }, [stockLoading, harvestsLoading, fumigationsLoading, transfersLoading, activitiesLoading,
+      stockError, harvestsError, fumigationsError, transfersError, activitiesError]);
   
   // Cargar datos cuando cambien las dependencias
   useEffect(() => {
@@ -268,6 +226,7 @@ const useDashboardController = () => {
         loadHarvests(),
         loadFumigations(),
         loadTransfers()
+        // Las actividades se cargan automáticamente por el contexto
       ]);
     } catch (err) {
       console.error('Error al recargar datos:', err);
@@ -288,7 +247,7 @@ const useDashboardController = () => {
     pendingTransfers,
     pendingFumigations,
     upcomingHarvests,
-    recentActivities,
+    recentActivities, // ACTUALIZADO: Ahora contiene actividades reales
     loading,
     error,
     refreshData

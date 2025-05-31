@@ -1,4 +1,4 @@
-// src/contexts/ActivityContext.js - Contexto para el historial de actividades
+// src/contexts/ActivityContext.js - Contexto actualizado con paginación
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   collection, 
@@ -7,9 +7,9 @@ import {
   query, 
   orderBy,
   limit,
+  startAfter,
   where,
-  serverTimestamp,
-  Timestamp
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../api/firebase';
 import { useAuth } from './AuthContext';
@@ -26,9 +26,10 @@ export function ActivityProvider({ children }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [lastVisible, setLastVisible] = useState(null);
 
-  // Cargar actividades recientes
-  const loadActivities = useCallback(async (limitCount = 50) => {
+  // Cargar actividades con paginación
+  const loadActivities = useCallback(async (limitCount = 50, reset = true) => {
     try {
       setLoading(true);
       setError('');
@@ -51,7 +52,17 @@ export function ActivityProvider({ children }) {
         });
       });
       
-      setActivities(activitiesData);
+      if (reset) {
+        setActivities(activitiesData);
+      } else {
+        setActivities(prev => [...prev, ...activitiesData]);
+      }
+      
+      // Guardar el último documento para paginación
+      if (querySnapshot.docs.length > 0) {
+        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      }
+      
       return activitiesData;
     } catch (error) {
       console.error('Error al cargar actividades:', error);
@@ -61,6 +72,51 @@ export function ActivityProvider({ children }) {
       setLoading(false);
     }
   }, []);
+
+  // Cargar más actividades (paginación)
+  const loadMoreActivities = useCallback(async (limitCount = 20) => {
+    try {
+      if (!lastVisible) return [];
+      
+      setLoading(true);
+      setError('');
+      
+      const activitiesQuery = query(
+        collection(db, 'activities'),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastVisible),
+        limit(limitCount)
+      );
+      
+      const querySnapshot = await getDocs(activitiesQuery);
+      const activitiesData = [];
+      
+      querySnapshot.forEach((doc) => {
+        const activityData = doc.data();
+        activitiesData.push({
+          id: doc.id,
+          ...activityData,
+          createdAt: activityData.createdAt ? new Date(activityData.createdAt.seconds * 1000) : new Date()
+        });
+      });
+      
+      // Agregar a las actividades existentes
+      setActivities(prev => [...prev, ...activitiesData]);
+      
+      // Actualizar el último documento visible
+      if (querySnapshot.docs.length > 0) {
+        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      }
+      
+      return activitiesData;
+    } catch (error) {
+      console.error('Error al cargar más actividades:', error);
+      setError('Error al cargar más actividades: ' + error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [lastVisible]);
 
   // Registrar una nueva actividad
   const logActivity = useCallback(async (activityData) => {
@@ -84,14 +140,13 @@ export function ActivityProvider({ children }) {
       await addDoc(collection(db, 'activities'), activity);
       
       // Actualizar las actividades locales agregando la nueva al principio
-      setActivities(prev => [
-        {
-          id: Date.now().toString(), // ID temporal
-          ...activity,
-          createdAt: new Date()
-        },
-        ...prev.slice(0, 49) // Mantener solo las 50 más recientes
-      ]);
+      const newActivity = {
+        id: Date.now().toString(), // ID temporal
+        ...activity,
+        createdAt: new Date()
+      };
+
+      setActivities(prev => [newActivity, ...prev]);
 
     } catch (error) {
       console.error('Error al registrar actividad:', error);
@@ -103,12 +158,13 @@ export function ActivityProvider({ children }) {
   const loadActivitiesByEntity = useCallback(async (entity, entityId = null) => {
     try {
       setLoading(true);
+      setError('');
       
       let activitiesQuery = query(
         collection(db, 'activities'),
         where('entity', '==', entity),
         orderBy('createdAt', 'desc'),
-        limit(20)
+        limit(50)
       );
       
       if (entityId) {
@@ -117,7 +173,7 @@ export function ActivityProvider({ children }) {
           where('entity', '==', entity),
           where('entityId', '==', entityId),
           orderBy('createdAt', 'desc'),
-          limit(20)
+          limit(50)
         );
       }
       
@@ -133,9 +189,11 @@ export function ActivityProvider({ children }) {
         });
       });
       
+      setActivities(activitiesData);
       return activitiesData;
     } catch (error) {
       console.error('Error al cargar actividades por entidad:', error);
+      setError('Error al cargar actividades: ' + error.message);
       throw error;
     } finally {
       setLoading(false);
@@ -146,12 +204,13 @@ export function ActivityProvider({ children }) {
   const loadActivitiesByUser = useCallback(async (userId) => {
     try {
       setLoading(true);
+      setError('');
       
       const activitiesQuery = query(
         collection(db, 'activities'),
         where('userId', '==', userId),
         orderBy('createdAt', 'desc'),
-        limit(30)
+        limit(50)
       );
       
       const querySnapshot = await getDocs(activitiesQuery);
@@ -166,19 +225,26 @@ export function ActivityProvider({ children }) {
         });
       });
       
+      setActivities(activitiesData);
       return activitiesData;
     } catch (error) {
       console.error('Error al cargar actividades por usuario:', error);
+      setError('Error al cargar actividades: ' + error.message);
       throw error;
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Obtener actividades recientes para el dashboard (últimas 10)
+  const getRecentActivities = useCallback(() => {
+    return activities.slice(0, 10);
+  }, [activities]);
+
   // Cargar actividades al inicializar
   useEffect(() => {
     if (currentUser) {
-      loadActivities();
+      loadActivities(50);
     }
   }, [currentUser, loadActivities]);
 
@@ -188,8 +254,10 @@ export function ActivityProvider({ children }) {
     error,
     logActivity,
     loadActivities,
+    loadMoreActivities,
     loadActivitiesByEntity,
-    loadActivitiesByUser
+    loadActivitiesByUser,
+    getRecentActivities
   };
 
   return (

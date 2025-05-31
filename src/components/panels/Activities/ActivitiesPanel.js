@@ -1,4 +1,5 @@
-import React from 'react';
+// src/components/panels/Activities/ActivitiesPanel.js - Panel de historial de actividades
+import React, { useState } from 'react';
 import './activities.css';
 
 const ActivitiesPanel = ({
@@ -10,17 +11,45 @@ const ActivitiesPanel = ({
   onFilterChange,
   onSearch,
   onRefresh,
-  onClearFilters
+  onClearFilters,
+  onLoadMore,
+  hasMore,
+  totalCount
 }) => {
-  // Función para formatear fecha y hora
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+  // Función para formatear fecha y hora relativa
   const formatDateTime = (date) => {
-    return new Date(date).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const now = new Date();
+    const activityDate = new Date(date);
+    const diffTime = now - activityDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
+
+    if (diffMinutes < 5) {
+      return { text: 'Hace un momento', class: 'recent' };
+    } else if (diffMinutes < 60) {
+      return { text: `Hace ${diffMinutes} minutos`, class: 'recent' };
+    } else if (diffHours < 24) {
+      return { 
+        text: diffHours === 1 ? 'Hace 1 hora' : `Hace ${diffHours} horas`, 
+        class: 'today' 
+      };
+    } else if (diffDays === 1) {
+      return { text: 'Ayer', class: 'yesterday' };
+    } else if (diffDays < 7) {
+      return { text: `Hace ${diffDays} días`, class: '' };
+    } else {
+      return { 
+        text: activityDate.toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }), 
+        class: '' 
+      };
+    }
   };
 
   // Función para obtener el icono según el tipo de entidad
@@ -33,7 +62,8 @@ const ActivitiesPanel = ({
       'purchase': 'fas fa-shopping-cart',
       'expense': 'fas fa-receipt',
       'field': 'fas fa-seedling',
-      'warehouse': 'fas fa-warehouse'
+      'warehouse': 'fas fa-warehouse',
+      'user': 'fas fa-user'
     };
     return iconMap[entity] || 'fas fa-info-circle';
   };
@@ -45,13 +75,32 @@ const ActivitiesPanel = ({
       'update': 'info',
       'delete': 'danger',
       'approve': 'success',
+      'reject': 'danger',
       'complete': 'success',
-      'cancel': 'warning'
+      'cancel': 'warning',
+      'ship': 'info',
+      'receive': 'success'
     };
     return colorMap[type] || 'primary';
   };
 
-  if (loading) {
+  // Función para obtener texto en español del tipo de entidad
+  const getEntityText = (entity) => {
+    const entityMap = {
+      'product': 'Producto',
+      'transfer': 'Transferencia',
+      'fumigation': 'Fumigación',
+      'harvest': 'Cosecha',
+      'purchase': 'Compra',
+      'expense': 'Gasto',
+      'field': 'Campo',
+      'warehouse': 'Almacén',
+      'user': 'Usuario'
+    };
+    return entityMap[entity] || entity;
+  };
+
+  if (loading && activities.length === 0) {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
@@ -65,80 +114,117 @@ const ActivitiesPanel = ({
       {/* Encabezado */}
       <div className="activities-header">
         <h1 className="activities-title">Historial de Actividades</h1>
-        <button className="btn btn-outline" onClick={onRefresh}>
-          <i className="fas fa-sync-alt"></i> Actualizar
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div className="activities-filters">
-        <div className="filters-row">
-          <div className="filter-group">
-            <label>Buscar:</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Buscar en actividades..."
-              value={filters.searchTerm}
-              onChange={(e) => onSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="filter-group">
-            <label>Entidad:</label>
-            <select
-              className="form-control"
-              value={filters.entity}
-              onChange={(e) => onFilterChange('entity', e.target.value)}
-            >
-              {filterOptions.entities.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>Acción:</label>
-            <select
-              className="form-control"
-              value={filters.type}
-              onChange={(e) => onFilterChange('type', e.target.value)}
-            >
-              {filterOptions.types.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>Desde:</label>
-            <input
-              type="date"
-              className="form-control"
-              value={filters.startDate}
-              onChange={(e) => onFilterChange('startDate', e.target.value)}
-            />
-          </div>
-
-          <div className="filter-group">
-            <label>Hasta:</label>
-            <input
-              type="date"
-              className="form-control"
-              value={filters.endDate}
-              onChange={(e) => onFilterChange('endDate', e.target.value)}
-            />
-          </div>
-
-          <button className="btn btn-outline" onClick={onClearFilters}>
-            <i className="fas fa-eraser"></i> Limpiar
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          <button 
+            className="btn btn-outline" 
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+          >
+            <i className="fas fa-filter"></i> 
+            {filtersExpanded ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+          </button>
+          <button className="btn btn-outline" onClick={onRefresh}>
+            <i className="fas fa-sync-alt"></i> Actualizar
           </button>
         </div>
       </div>
+
+      {/* Filtros */}
+      {filtersExpanded && (
+        <div className="activities-filters">
+          <div className="filters-row">
+            <div className="filter-group">
+              <label>Buscar:</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Buscar en actividades..."
+                value={filters.searchTerm}
+                onChange={(e) => onSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label>Entidad:</label>
+              <select
+                className="form-control"
+                value={filters.entity}
+                onChange={(e) => onFilterChange('entity', e.target.value)}
+              >
+                {filterOptions.entities.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>Acción:</label>
+              <select
+                className="form-control"
+                value={filters.type}
+                onChange={(e) => onFilterChange('type', e.target.value)}
+              >
+                {filterOptions.types.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>Usuario:</label>
+              <select
+                className="form-control"
+                value={filters.user}
+                onChange={(e) => onFilterChange('user', e.target.value)}
+              >
+                {filterOptions.users?.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                )) || []}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>Desde:</label>
+              <input
+                type="date"
+                className="form-control"
+                value={filters.startDate}
+                onChange={(e) => onFilterChange('startDate', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label>Hasta:</label>
+              <input
+                type="date"
+                className="form-control"
+                value={filters.endDate}
+                onChange={(e) => onFilterChange('endDate', e.target.value)}
+              />
+            </div>
+
+            <button className="btn btn-outline" onClick={onClearFilters}>
+              <i className="fas fa-eraser"></i> Limpiar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Información de resultados */}
+      {totalCount > 0 && (
+        <div style={{ 
+          marginBottom: 'var(--spacing-md)', 
+          fontSize: 'var(--font-size-sm)', 
+          color: 'var(--text-secondary)' 
+        }}>
+          Mostrando {activities.length} de {totalCount} actividades
+        </div>
+      )}
 
       {/* Lista de actividades */}
       <div className="activities-list">
@@ -149,40 +235,77 @@ const ActivitiesPanel = ({
         )}
 
         {activities.length > 0 ? (
-          <div className="activities-timeline">
-            {activities.map((activity, index) => (
-              <div key={activity.id || index} className="activity-item">
-                <div className={`activity-icon ${getActionColor(activity.type)}`}>
-                  <i className={getEntityIcon(activity.entity)}></i>
-                </div>
+          <>
+            <div className="activities-timeline">
+              {activities.map((activity, index) => {
+                const timeInfo = formatDateTime(activity.createdAt);
                 
-                <div className="activity-content">
-                  <div className="activity-header">
-                    <span className="activity-action">{activity.action}</span>
-                    <span className="activity-time">{formatDateTime(activity.createdAt)}</span>
+                return (
+                  <div key={activity.id || index} className="activity-item">
+                    <div className={`activity-icon ${activity.entity} ${getActionColor(activity.type)}`}>
+                      <i className={getEntityIcon(activity.entity)}></i>
+                    </div>
+                    
+                    <div className="activity-content">
+                      <div className="activity-header">
+                        <span className="activity-action">{activity.action}</span>
+                        <span className={`activity-time ${timeInfo.class}`}>
+                          {timeInfo.text}
+                        </span>
+                      </div>
+                      
+                      <div className="activity-description">
+                        {activity.description}
+                      </div>
+                      
+                      <div className="activity-meta">
+                        <span className="activity-user">
+                          <i className="fas fa-user"></i> {activity.userName}
+                        </span>
+                        <span className={`activity-type ${getActionColor(activity.type)}`}>
+                          {getEntityText(activity.entity)}
+                        </span>
+                        {activity.metadata?.category && (
+                          <span className="activity-type info">
+                            {activity.metadata.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="activity-description">
-                    {activity.description}
+                );
+              })}
+            </div>
+
+            {/* Paginación/Cargar más */}
+            {(hasMore || loading) && (
+              <div className="activities-pagination">
+                {loading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                    <div className="spinner" style={{ width: '20px', height: '20px' }}></div>
+                    <span>Cargando más actividades...</span>
                   </div>
-                  
-                  <div className="activity-meta">
-                    <span className="activity-user">
-                      <i className="fas fa-user"></i> {activity.userName}
-                    </span>
-                    <span className={`activity-type ${getActionColor(activity.type)}`}>
-                      {activity.entity}
-                    </span>
-                  </div>
-                </div>
+                ) : (
+                  <button 
+                    className="load-more-btn" 
+                    onClick={onLoadMore}
+                    disabled={!hasMore}
+                  >
+                    <i className="fas fa-chevron-down"></i> Cargar más actividades
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         ) : (
           <div className="activities-empty">
             <i className="fas fa-history"></i>
             <h3>No hay actividades</h3>
-            <p>No se encontraron actividades con los filtros aplicados.</p>
+            <p>
+              {filters.searchTerm || filters.entity !== 'all' || filters.type !== 'all' || filters.startDate || filters.endDate
+                ? 'No se encontraron actividades con los filtros aplicados.'
+                : 'Aún no se han registrado actividades en el sistema.'}
+            </p>
           </div>
         )}
       </div>
