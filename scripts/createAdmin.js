@@ -57,11 +57,12 @@ async function createAdmin() {
         dashboard: true,
         products: true,
         transfers: true,
-        purchases: true, // Agregar permiso para compras
+        purchases: true,
+        expenses: true, // NUEVO
         fumigations: true,
         fields: true,
         warehouses: true,
-        reports: true,
+        reports: true, // NUEVO
         users: true,
         harvests: true
       },
