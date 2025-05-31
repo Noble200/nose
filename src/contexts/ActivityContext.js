@@ -1,5 +1,5 @@
-// src/contexts/ActivityContext.js - Contexto CORREGIDO con manejo de valores undefined
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+// src/contexts/ActivityContext.js - CORREGIDO: Sin bucles infinitos ni logs excesivos
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { 
   collection, 
   getDocs, 
@@ -21,7 +21,7 @@ export function useActivities() {
   return useContext(ActivityContext);
 }
 
-// NUEVA FUNCIÓN: Limpiar valores undefined de un objeto recursivamente
+// Limpiar valores undefined de un objeto recursivamente
 const cleanUndefinedValues = (obj) => {
   if (obj === null || obj === undefined) {
     return null;
@@ -53,14 +53,22 @@ export function ActivityProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [lastVisible, setLastVisible] = useState(null);
+  
+  // CORREGIDO: Usar useRef para evitar bucles infinitos
+  const isLoadingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   // Cargar actividades con paginación
   const loadActivities = useCallback(async (limitCount = 50, reset = true) => {
+    // CORREGIDO: Evitar múltiples cargas simultáneas
+    if (isLoadingRef.current) {
+      return [];
+    }
+
     try {
+      isLoadingRef.current = true;
       setLoading(true);
       setError('');
-      
-      console.log('🔍 ActivityContext.loadActivities - Cargando actividades...', { limitCount, reset });
       
       const activitiesQuery = query(
         collection(db, 'activities'), 
@@ -80,8 +88,6 @@ export function ActivityProvider({ children }) {
         });
       });
       
-      console.log('✅ ActivityContext.loadActivities - Actividades cargadas:', activitiesData.length);
-      
       if (reset) {
         setActivities(activitiesData);
       } else {
@@ -95,19 +101,21 @@ export function ActivityProvider({ children }) {
       
       return activitiesData;
     } catch (error) {
-      console.error('❌ ActivityContext.loadActivities - Error:', error);
+      console.error('Error al cargar actividades:', error);
       setError('Error al cargar actividades: ' + error.message);
       throw error;
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   }, []);
 
   // Cargar más actividades (paginación)
   const loadMoreActivities = useCallback(async (limitCount = 20) => {
+    if (!lastVisible || isLoadingRef.current) return [];
+    
     try {
-      if (!lastVisible) return [];
-      
+      isLoadingRef.current = true;
       setLoading(true);
       setError('');
       
@@ -145,20 +153,18 @@ export function ActivityProvider({ children }) {
       throw error;
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   }, [lastVisible]);
 
-  // CORREGIDO: Registrar una nueva actividad con limpieza de valores undefined
+  // Registrar una nueva actividad con limpieza de valores undefined
   const logActivity = useCallback(async (activityData) => {
     try {
       if (!currentUser) {
-        console.warn('🔍 ActivityContext.logActivity - No hay usuario autenticado');
         return;
       }
 
-      console.log('🔍 ActivityContext.logActivity - Datos recibidos:', activityData);
-
-      // CORREGIDO: Limpiar valores undefined antes de enviar a Firestore
+      // Limpiar valores undefined antes de enviar a Firestore
       const cleanedActivityData = cleanUndefinedValues({
         type: activityData.type || 'unknown',
         entity: activityData.entity || 'unknown',
@@ -173,17 +179,13 @@ export function ActivityProvider({ children }) {
         createdAt: serverTimestamp()
       });
 
-      console.log('🔍 ActivityContext.logActivity - Datos limpiados:', cleanedActivityData);
-
       // Validar que los datos requeridos estén presentes
       if (!cleanedActivityData.type || !cleanedActivityData.entity) {
-        console.error('❌ ActivityContext.logActivity - Datos insuficientes:', cleanedActivityData);
         return;
       }
 
       // Insertar en Firestore
       const docRef = await addDoc(collection(db, 'activities'), cleanedActivityData);
-      console.log('✅ ActivityContext.logActivity - Actividad guardada con ID:', docRef.id);
       
       // Actualizar las actividades locales agregando la nueva al principio
       const newActivity = {
@@ -197,7 +199,7 @@ export function ActivityProvider({ children }) {
       return docRef.id;
 
     } catch (error) {
-      console.error('❌ ActivityContext.logActivity - Error al registrar actividad:', error);
+      console.error('Error al registrar actividad:', error);
       // No lanzamos el error para que no interrumpa la operación principal
       setError('Error al registrar actividad: ' + error.message);
     }
@@ -205,7 +207,10 @@ export function ActivityProvider({ children }) {
 
   // Cargar actividades por tipo de entidad
   const loadActivitiesByEntity = useCallback(async (entity, entityId = null) => {
+    if (isLoadingRef.current) return [];
+    
     try {
+      isLoadingRef.current = true;
       setLoading(true);
       setError('');
       
@@ -246,12 +251,16 @@ export function ActivityProvider({ children }) {
       throw error;
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   }, []);
 
   // Cargar actividades por usuario
   const loadActivitiesByUser = useCallback(async (userId) => {
+    if (isLoadingRef.current) return [];
+    
     try {
+      isLoadingRef.current = true;
       setLoading(true);
       setError('');
       
@@ -282,6 +291,7 @@ export function ActivityProvider({ children }) {
       throw error;
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   }, []);
 
@@ -290,16 +300,18 @@ export function ActivityProvider({ children }) {
     return activities.slice(0, 10);
   }, [activities]);
 
-  // Cargar actividades al inicializar
+  // CORREGIDO: Cargar actividades solo una vez al inicializar
   useEffect(() => {
-    if (currentUser) {
-      console.log('🔍 ActivityContext - Usuario detectado, cargando actividades...');
+    // Solo cargar si hay usuario y no se ha inicializado antes
+    if (currentUser && !hasInitializedRef.current && !isLoadingRef.current) {
+      hasInitializedRef.current = true;
       loadActivities(50);
-    } else {
-      console.log('🔍 ActivityContext - No hay usuario, limpiando actividades...');
+    } else if (!currentUser) {
+      // Limpiar actividades si no hay usuario
       setActivities([]);
+      hasInitializedRef.current = false;
     }
-  }, [currentUser, loadActivities]);
+  }, [currentUser]); // CORREGIDO: Remover loadActivities de las dependencias
 
   const value = {
     activities,
@@ -312,13 +324,6 @@ export function ActivityProvider({ children }) {
     loadActivitiesByUser,
     getRecentActivities
   };
-
-  console.log('🔍 ActivityContext - Valor del contexto:', {
-    activitiesCount: activities.length,
-    loading,
-    error,
-    logActivityExists: !!logActivity
-  });
 
   return (
     <ActivityContext.Provider value={value}>
