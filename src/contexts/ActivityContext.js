@@ -1,4 +1,4 @@
-// src/contexts/ActivityContext.js - CORREGIDO: Sin bucles infinitos ni logs excesivos
+// src/contexts/ActivityContext.js - CORREGIDO: Manejo correcto de fechas
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { 
   collection, 
@@ -20,6 +20,48 @@ const ActivityContext = createContext();
 export function useActivities() {
   return useContext(ActivityContext);
 }
+
+// Función para convertir timestamp de Firebase a Date de manera segura
+const convertFirebaseTimestamp = (timestamp) => {
+  try {
+    if (!timestamp) {
+      return new Date(); // Fecha actual si no hay timestamp
+    }
+    
+    // Si ya es un objeto Date válido
+    if (timestamp instanceof Date && !isNaN(timestamp.getTime())) {
+      return timestamp;
+    }
+    
+    // Si es un timestamp de Firebase con propiedad seconds
+    if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000);
+    }
+    
+    // Si es un timestamp de Firebase con método toDate
+    if (timestamp && typeof timestamp.toDate === 'function') {
+      return timestamp.toDate();
+    }
+    
+    // Si es un string de fecha
+    if (typeof timestamp === 'string') {
+      const date = new Date(timestamp);
+      return isNaN(date.getTime()) ? new Date() : date;
+    }
+    
+    // Si es un número (timestamp en milisegundos)
+    if (typeof timestamp === 'number') {
+      return new Date(timestamp);
+    }
+    
+    console.warn('Formato de timestamp no reconocido:', timestamp);
+    return new Date(); // Fecha actual como fallback
+    
+  } catch (error) {
+    console.error('Error al convertir timestamp:', error);
+    return new Date(); // Fecha actual como fallback
+  }
+};
 
 // Limpiar valores undefined de un objeto recursivamente
 const cleanUndefinedValues = (obj) => {
@@ -54,13 +96,12 @@ export function ActivityProvider({ children }) {
   const [error, setError] = useState('');
   const [lastVisible, setLastVisible] = useState(null);
   
-  // CORREGIDO: Usar useRef para evitar bucles infinitos
+  // Usar useRef para evitar bucles infinitos
   const isLoadingRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
-  // Cargar actividades con paginación
+  // Cargar actividades con paginación - CORREGIDO: Manejo de fechas
   const loadActivities = useCallback(async (limitCount = 50, reset = true) => {
-    // CORREGIDO: Evitar múltiples cargas simultáneas
     if (isLoadingRef.current) {
       return [];
     }
@@ -69,6 +110,8 @@ export function ActivityProvider({ children }) {
       isLoadingRef.current = true;
       setLoading(true);
       setError('');
+      
+      console.log('Cargando actividades...'); // Debug
       
       const activitiesQuery = query(
         collection(db, 'activities'), 
@@ -81,12 +124,31 @@ export function ActivityProvider({ children }) {
       
       querySnapshot.forEach((doc) => {
         const activityData = doc.data();
-        activitiesData.push({
+        
+        console.log('Actividad raw data:', activityData); // Debug
+        
+        // CORREGIDO: Convertir la fecha correctamente
+        const convertedActivity = {
           id: doc.id,
-          ...activityData,
-          createdAt: activityData.createdAt ? new Date(activityData.createdAt.seconds * 1000) : new Date()
-        });
+          type: activityData.type || 'unknown',
+          entity: activityData.entity || 'unknown',
+          entityId: activityData.entityId || '',
+          entityName: activityData.entityName || '',
+          action: activityData.action || '',
+          description: activityData.description || '',
+          metadata: activityData.metadata || {},
+          userId: activityData.userId || '',
+          userName: activityData.userName || 'Usuario desconocido',
+          userEmail: activityData.userEmail || '',
+          createdAt: convertFirebaseTimestamp(activityData.createdAt) // CORREGIDO
+        };
+        
+        console.log('Actividad procesada:', convertedActivity); // Debug
+        
+        activitiesData.push(convertedActivity);
       });
+      
+      console.log(`Total actividades cargadas: ${activitiesData.length}`); // Debug
       
       if (reset) {
         setActivities(activitiesData);
@@ -110,7 +172,7 @@ export function ActivityProvider({ children }) {
     }
   }, []);
 
-  // Cargar más actividades (paginación)
+  // Cargar más actividades (paginación) - CORREGIDO: Manejo de fechas
   const loadMoreActivities = useCallback(async (limitCount = 20) => {
     if (!lastVisible || isLoadingRef.current) return [];
     
@@ -131,11 +193,24 @@ export function ActivityProvider({ children }) {
       
       querySnapshot.forEach((doc) => {
         const activityData = doc.data();
-        activitiesData.push({
+        
+        // CORREGIDO: Convertir la fecha correctamente
+        const convertedActivity = {
           id: doc.id,
-          ...activityData,
-          createdAt: activityData.createdAt ? new Date(activityData.createdAt.seconds * 1000) : new Date()
-        });
+          type: activityData.type || 'unknown',
+          entity: activityData.entity || 'unknown',
+          entityId: activityData.entityId || '',
+          entityName: activityData.entityName || '',
+          action: activityData.action || '',
+          description: activityData.description || '',
+          metadata: activityData.metadata || {},
+          userId: activityData.userId || '',
+          userName: activityData.userName || 'Usuario desconocido',
+          userEmail: activityData.userEmail || '',
+          createdAt: convertFirebaseTimestamp(activityData.createdAt) // CORREGIDO
+        };
+        
+        activitiesData.push(convertedActivity);
       });
       
       // Agregar a las actividades existentes
@@ -161,8 +236,11 @@ export function ActivityProvider({ children }) {
   const logActivity = useCallback(async (activityData) => {
     try {
       if (!currentUser) {
+        console.warn('No hay usuario autenticado para registrar actividad');
         return;
       }
+
+      console.log('Registrando nueva actividad:', activityData); // Debug
 
       // Limpiar valores undefined antes de enviar a Firestore
       const cleanedActivityData = cleanUndefinedValues({
@@ -176,22 +254,27 @@ export function ActivityProvider({ children }) {
         userId: currentUser.uid,
         userName: currentUser.displayName || currentUser.email || 'Usuario desconocido',
         userEmail: currentUser.email || '',
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp() // Usar serverTimestamp para consistencia
       });
 
       // Validar que los datos requeridos estén presentes
       if (!cleanedActivityData.type || !cleanedActivityData.entity) {
+        console.warn('Datos insuficientes para registrar actividad:', cleanedActivityData);
         return;
       }
+
+      console.log('Datos limpios para Firestore:', cleanedActivityData); // Debug
 
       // Insertar en Firestore
       const docRef = await addDoc(collection(db, 'activities'), cleanedActivityData);
       
-      // Actualizar las actividades locales agregando la nueva al principio
+      console.log('Actividad registrada con ID:', docRef.id); // Debug
+      
+      // CORREGIDO: Actualizar las actividades locales con fecha correcta
       const newActivity = {
         id: docRef.id,
         ...cleanedActivityData,
-        createdAt: new Date()
+        createdAt: new Date() // Usar fecha actual para la visualización inmediata
       };
 
       setActivities(prev => [newActivity, ...prev]);
@@ -200,12 +283,11 @@ export function ActivityProvider({ children }) {
 
     } catch (error) {
       console.error('Error al registrar actividad:', error);
-      // No lanzamos el error para que no interrumpa la operación principal
       setError('Error al registrar actividad: ' + error.message);
     }
   }, [currentUser]);
 
-  // Cargar actividades por tipo de entidad
+  // Cargar actividades por tipo de entidad - CORREGIDO: Manejo de fechas
   const loadActivitiesByEntity = useCallback(async (entity, entityId = null) => {
     if (isLoadingRef.current) return [];
     
@@ -236,11 +318,24 @@ export function ActivityProvider({ children }) {
       
       querySnapshot.forEach((doc) => {
         const activityData = doc.data();
-        activitiesData.push({
+        
+        // CORREGIDO: Convertir la fecha correctamente
+        const convertedActivity = {
           id: doc.id,
-          ...activityData,
-          createdAt: activityData.createdAt ? new Date(activityData.createdAt.seconds * 1000) : new Date()
-        });
+          type: activityData.type || 'unknown',
+          entity: activityData.entity || 'unknown',
+          entityId: activityData.entityId || '',
+          entityName: activityData.entityName || '',
+          action: activityData.action || '',
+          description: activityData.description || '',
+          metadata: activityData.metadata || {},
+          userId: activityData.userId || '',
+          userName: activityData.userName || 'Usuario desconocido',
+          userEmail: activityData.userEmail || '',
+          createdAt: convertFirebaseTimestamp(activityData.createdAt) // CORREGIDO
+        };
+        
+        activitiesData.push(convertedActivity);
       });
       
       setActivities(activitiesData);
@@ -255,7 +350,7 @@ export function ActivityProvider({ children }) {
     }
   }, []);
 
-  // Cargar actividades por usuario
+  // Cargar actividades por usuario - CORREGIDO: Manejo de fechas
   const loadActivitiesByUser = useCallback(async (userId) => {
     if (isLoadingRef.current) return [];
     
@@ -276,11 +371,24 @@ export function ActivityProvider({ children }) {
       
       querySnapshot.forEach((doc) => {
         const activityData = doc.data();
-        activitiesData.push({
+        
+        // CORREGIDO: Convertir la fecha correctamente
+        const convertedActivity = {
           id: doc.id,
-          ...activityData,
-          createdAt: activityData.createdAt ? new Date(activityData.createdAt.seconds * 1000) : new Date()
-        });
+          type: activityData.type || 'unknown',
+          entity: activityData.entity || 'unknown',
+          entityId: activityData.entityId || '',
+          entityName: activityData.entityName || '',
+          action: activityData.action || '',
+          description: activityData.description || '',
+          metadata: activityData.metadata || {},
+          userId: activityData.userId || '',
+          userName: activityData.userName || 'Usuario desconocido',
+          userEmail: activityData.userEmail || '',
+          createdAt: convertFirebaseTimestamp(activityData.createdAt) // CORREGIDO
+        };
+        
+        activitiesData.push(convertedActivity);
       });
       
       setActivities(activitiesData);
@@ -300,18 +408,18 @@ export function ActivityProvider({ children }) {
     return activities.slice(0, 10);
   }, [activities]);
 
-  // CORREGIDO: Cargar actividades solo una vez al inicializar
+  // Cargar actividades solo una vez al inicializar
   useEffect(() => {
-    // Solo cargar si hay usuario y no se ha inicializado antes
     if (currentUser && !hasInitializedRef.current && !isLoadingRef.current) {
+      console.log('Inicializando actividades para usuario:', currentUser.email); // Debug
       hasInitializedRef.current = true;
       loadActivities(50);
     } else if (!currentUser) {
-      // Limpiar actividades si no hay usuario
+      console.log('Limpiando actividades - no hay usuario'); // Debug
       setActivities([]);
       hasInitializedRef.current = false;
     }
-  }, [currentUser]); // CORREGIDO: Remover loadActivities de las dependencias
+  }, [currentUser]);
 
   const value = {
     activities,

@@ -1,4 +1,4 @@
-// src/components/panels/Activities/ActivitiesPanel.js - Panel de historial de actividades CORREGIDO
+// src/components/panels/Activities/ActivitiesPanel.js - Panel CORREGIDO con manejo mejorado de fechas
 import React, { useState } from 'react';
 import './activities.css';
 
@@ -18,40 +18,57 @@ const ActivitiesPanel = ({
 }) => {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
-  // CORREGIDO: Función para formatear fecha y hora relativa
+  // CORREGIDO: Función mejorada para formatear fecha y hora relativa
   const formatDateTime = (date) => {
     try {
       // Validar que date existe
       if (!date) {
+        console.warn('Fecha no proporcionada');
         return { text: 'Fecha desconocida', class: '' };
       }
+
+      console.log('Formateando fecha:', date, 'Tipo:', typeof date); // Debug
 
       const now = new Date();
       let activityDate;
 
-      // Convertir diferentes tipos de fecha a objeto Date
+      // CORREGIDO: Manejo más robusto de diferentes tipos de fecha
       if (date instanceof Date) {
+        // Ya es un objeto Date
         activityDate = date;
-      } else if (date?.seconds) {
-        // Timestamp de Firebase
-        activityDate = new Date(date.seconds * 1000);
-      } else if (date?.toDate && typeof date.toDate === 'function') {
-        // Timestamp object con método toDate
-        activityDate = date.toDate();
+      } else if (date && typeof date === 'object') {
+        // Posible timestamp de Firebase
+        if (date.seconds && typeof date.seconds === 'number') {
+          // Timestamp de Firebase con propiedad seconds
+          activityDate = new Date(date.seconds * 1000);
+        } else if (typeof date.toDate === 'function') {
+          // Timestamp object con método toDate
+          activityDate = date.toDate();
+        } else if (date.nanoseconds && date.seconds) {
+          // Timestamp completo de Firebase
+          activityDate = new Date(date.seconds * 1000 + date.nanoseconds / 1000000);
+        } else {
+          console.warn('Objeto de fecha no reconocido:', date);
+          return { text: 'Formato de fecha desconocido', class: '' };
+        }
       } else if (typeof date === 'string') {
+        // String de fecha
         activityDate = new Date(date);
       } else if (typeof date === 'number') {
-        activityDate = new Date(date);
+        // Timestamp en milisegundos o segundos
+        activityDate = date > 1000000000000 ? new Date(date) : new Date(date * 1000);
       } else {
-        console.warn('Formato de fecha no reconocido:', date);
+        console.warn('Tipo de fecha no reconocido:', typeof date, date);
+        return { text: 'Tipo de fecha no válido', class: '' };
+      }
+
+      // Verificar que la fecha es válida después de la conversión
+      if (!activityDate || isNaN(activityDate.getTime())) {
+        console.warn('Fecha inválida después de conversión:', activityDate);
         return { text: 'Fecha inválida', class: '' };
       }
 
-      // Verificar que la fecha es válida
-      if (isNaN(activityDate.getTime())) {
-        console.warn('Fecha inválida detectada:', date);
-        return { text: 'Fecha inválida', class: '' };
-      }
+      console.log('Fecha convertida exitosamente:', activityDate); // Debug
 
       // Calcular diferencias de tiempo
       const diffTime = now.getTime() - activityDate.getTime();
@@ -70,7 +87,7 @@ const ActivitiesPanel = ({
       } else if (diffMinutes < 5) {
         return { text: 'Hace un momento', class: 'recent' };
       } else if (diffMinutes < 60) {
-        return { text: `Hace ${diffMinutes} minutos`, class: 'recent' };
+        return { text: `Hace ${diffMinutes} min`, class: 'recent' };
       } else if (diffHours < 24) {
         return { 
           text: diffHours === 1 ? 'Hace 1 hora' : `Hace ${diffHours} horas`, 
@@ -80,7 +97,11 @@ const ActivitiesPanel = ({
         return { text: 'Ayer', class: 'yesterday' };
       } else if (diffDays < 7) {
         return { text: `Hace ${diffDays} días`, class: '' };
+      } else if (diffDays < 30) {
+        const weeks = Math.floor(diffDays / 7);
+        return { text: weeks === 1 ? 'Hace 1 semana' : `Hace ${weeks} semanas`, class: '' };
       } else {
+        // Para fechas muy antiguas, mostrar la fecha completa
         return { 
           text: activityDate.toLocaleDateString('es-ES', {
             day: '2-digit',
@@ -107,7 +128,8 @@ const ActivitiesPanel = ({
       'expense': 'fas fa-receipt',
       'field': 'fas fa-seedling',
       'warehouse': 'fas fa-warehouse',
-      'user': 'fas fa-user'
+      'user': 'fas fa-user',
+      'system': 'fas fa-cog'
     };
     return iconMap[entity] || 'fas fa-info-circle';
   };
@@ -123,7 +145,8 @@ const ActivitiesPanel = ({
       'complete': 'success',
       'cancel': 'warning',
       'ship': 'info',
-      'receive': 'success'
+      'receive': 'success',
+      'stock-adjust': 'warning'
     };
     return colorMap[type] || 'primary';
   };
@@ -139,9 +162,16 @@ const ActivitiesPanel = ({
       'expense': 'Gasto',
       'field': 'Campo',
       'warehouse': 'Almacén',
-      'user': 'Usuario'
+      'user': 'Usuario',
+      'system': 'Sistema'
     };
     return entityMap[entity] || entity;
+  };
+
+  // Función para truncar texto largo
+  const truncateText = (text, maxLength = 100) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   };
 
   if (loading && activities.length === 0) {
@@ -162,11 +192,12 @@ const ActivitiesPanel = ({
           <button 
             className="btn btn-outline" 
             onClick={() => setFiltersExpanded(!filtersExpanded)}
+            title={filtersExpanded ? 'Ocultar filtros' : 'Mostrar filtros'}
           >
-            <i className="fas fa-filter"></i> 
-            {filtersExpanded ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+            <i className={`fas fa-filter ${filtersExpanded ? 'fa-eye-slash' : 'fa-eye'}`}></i> 
+            {filtersExpanded ? 'Ocultar' : 'Filtros'}
           </button>
-          <button className="btn btn-outline" onClick={onRefresh}>
+          <button className="btn btn-outline" onClick={onRefresh} title="Actualizar actividades">
             <i className="fas fa-sync-alt"></i> Actualizar
           </button>
         </div>
@@ -182,7 +213,7 @@ const ActivitiesPanel = ({
                 type="text"
                 className="form-control"
                 placeholder="Buscar en actividades..."
-                value={filters.searchTerm}
+                value={filters.searchTerm || ''}
                 onChange={(e) => onSearch(e.target.value)}
               />
             </div>
@@ -191,14 +222,14 @@ const ActivitiesPanel = ({
               <label>Entidad:</label>
               <select
                 className="form-control"
-                value={filters.entity}
+                value={filters.entity || 'all'}
                 onChange={(e) => onFilterChange('entity', e.target.value)}
               >
-                {filterOptions.entities.map(option => (
+                {filterOptions.entities?.map(option => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
-                ))}
+                )) || []}
               </select>
             </div>
 
@@ -206,14 +237,14 @@ const ActivitiesPanel = ({
               <label>Acción:</label>
               <select
                 className="form-control"
-                value={filters.type}
+                value={filters.type || 'all'}
                 onChange={(e) => onFilterChange('type', e.target.value)}
               >
-                {filterOptions.types.map(option => (
+                {filterOptions.types?.map(option => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
-                ))}
+                )) || []}
               </select>
             </div>
 
@@ -221,7 +252,7 @@ const ActivitiesPanel = ({
               <label>Usuario:</label>
               <select
                 className="form-control"
-                value={filters.user}
+                value={filters.user || 'all'}
                 onChange={(e) => onFilterChange('user', e.target.value)}
               >
                 {filterOptions.users?.map(option => (
@@ -237,7 +268,7 @@ const ActivitiesPanel = ({
               <input
                 type="date"
                 className="form-control"
-                value={filters.startDate}
+                value={filters.startDate || ''}
                 onChange={(e) => onFilterChange('startDate', e.target.value)}
               />
             </div>
@@ -247,14 +278,16 @@ const ActivitiesPanel = ({
               <input
                 type="date"
                 className="form-control"
-                value={filters.endDate}
+                value={filters.endDate || ''}
                 onChange={(e) => onFilterChange('endDate', e.target.value)}
               />
             </div>
 
-            <button className="btn btn-outline" onClick={onClearFilters}>
-              <i className="fas fa-eraser"></i> Limpiar
-            </button>
+            <div className="filter-group" style={{ alignSelf: 'end' }}>
+              <button className="btn btn-outline" onClick={onClearFilters} title="Limpiar todos los filtros">
+                <i className="fas fa-eraser"></i> Limpiar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -264,9 +297,12 @@ const ActivitiesPanel = ({
         <div style={{ 
           marginBottom: 'var(--spacing-md)', 
           fontSize: 'var(--font-size-sm)', 
-          color: 'var(--text-secondary)' 
+          color: 'var(--text-secondary)',
+          padding: 'var(--spacing-sm)',
+          backgroundColor: 'var(--gray-50)',
+          borderRadius: 'var(--border-radius-md)'
         }}>
-          Mostrando {activities.length} de {totalCount} actividades
+          <i className="fas fa-info-circle"></i> Mostrando {activities.length} de {totalCount} actividades registradas
         </div>
       )}
 
@@ -292,26 +328,33 @@ const ActivitiesPanel = ({
                     
                     <div className="activity-content">
                       <div className="activity-header">
-                        <span className="activity-action">{activity.action}</span>
-                        <span className={`activity-time ${timeInfo.class}`}>
+                        <span className="activity-action" title={activity.action}>
+                          {truncateText(activity.action, 60)}
+                        </span>
+                        <span className={`activity-time ${timeInfo.class}`} title={activity.createdAt ? new Date(activity.createdAt).toLocaleString('es-ES') : 'Fecha desconocida'}>
                           {timeInfo.text}
                         </span>
                       </div>
                       
-                      <div className="activity-description">
-                        {activity.description}
+                      <div className="activity-description" title={activity.description}>
+                        {truncateText(activity.description, 120)}
                       </div>
                       
                       <div className="activity-meta">
-                        <span className="activity-user">
+                        <span className="activity-user" title={`Usuario: ${activity.userName}`}>
                           <i className="fas fa-user"></i> {activity.userName}
                         </span>
-                        <span className={`activity-type ${getActionColor(activity.type)}`}>
+                        <span className={`activity-type ${getActionColor(activity.type)}`} title={`Entidad: ${activity.entity}`}>
                           {getEntityText(activity.entity)}
                         </span>
                         {activity.metadata?.category && (
-                          <span className="activity-type info">
+                          <span className="activity-type info" title={`Categoría: ${activity.metadata.category}`}>
                             {activity.metadata.category}
+                          </span>
+                        )}
+                        {activity.entityName && (
+                          <span className="activity-type primary" title={`Elemento: ${activity.entityName}`}>
+                            {truncateText(activity.entityName, 20)}
                           </span>
                         )}
                       </div>
@@ -334,6 +377,7 @@ const ActivitiesPanel = ({
                     className="load-more-btn" 
                     onClick={onLoadMore}
                     disabled={!hasMore}
+                    title="Cargar más actividades del historial"
                   >
                     <i className="fas fa-chevron-down"></i> Cargar más actividades
                   </button>
@@ -350,6 +394,11 @@ const ActivitiesPanel = ({
                 ? 'No se encontraron actividades con los filtros aplicados.'
                 : 'Aún no se han registrado actividades en el sistema.'}
             </p>
+            {(filters.searchTerm || filters.entity !== 'all' || filters.type !== 'all' || filters.startDate || filters.endDate) && (
+              <button className="btn btn-primary" onClick={onClearFilters} style={{ marginTop: 'var(--spacing-md)' }}>
+                <i className="fas fa-eraser"></i> Limpiar filtros
+              </button>
+            )}
           </div>
         )}
       </div>

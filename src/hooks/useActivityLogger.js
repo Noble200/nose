@@ -1,4 +1,4 @@
-// src/hooks/useActivityLogger.js - Hook mejorado con fechas corregidas y cambios detallados
+// src/hooks/useActivityLogger.js - Hook mejorado con manejo correcto de fechas
 import { useCallback } from 'react';
 import { useActivities } from '../contexts/ActivityContext';
 
@@ -102,41 +102,40 @@ export const useActivityLogger = () => {
   // Función principal para registrar actividades
   const log = useCallback(async (action, entityData, additionalData = {}) => {
     try {
-      console.log('Registrando actividad:', action, entityData);
+      console.log('🔄 ActivityLogger - Registrando actividad:', action, entityData);
       
       // Extraer el tipo de entidad y acción del string de acción
       const [entity, actionType] = action.split('-');
       
       // Validar datos mínimos
       if (!entity || !actionType) {
-        console.warn('Acción malformada:', action);
+        console.warn('⚠️ ActivityLogger - Acción malformada:', action);
         return;
       }
       
-      // Construir el objeto de actividad
+      // Construir el objeto de actividad con datos limpios
       const activityData = {
         type: actionType, // 'create', 'update', 'delete', etc.
         entity: entity, // 'product', 'transfer', etc.
-        entityId: entityData.id || entityData._id || '',
+        entityId: getEntityId(entityData),
         entityName: getEntityName(entityData),
         action: actionDescriptions[action] || `${actionType} ${entity}`,
         description: generateDescription(action, entityData, additionalData),
-        icon: entityIcons[entity] || 'fas fa-info-circle',
-        metadata: {
+        metadata: cleanMetadata({
           ...additionalData,
           timestamp: new Date().toISOString(),
           userAgent: navigator.userAgent,
           originalData: sanitizeEntityData(entityData)
-        }
+        })
       };
 
-      console.log('Datos de actividad preparados:', activityData);
+      console.log('✅ ActivityLogger - Datos de actividad preparados:', activityData);
       
       await logActivity(activityData);
-      console.log('Actividad registrada exitosamente');
+      console.log('🎉 ActivityLogger - Actividad registrada exitosamente');
       
     } catch (error) {
-      console.error('Error al registrar actividad:', error);
+      console.error('❌ ActivityLogger - Error al registrar actividad:', error);
       // No interrumpir la operación principal
     }
   }, [logActivity]);
@@ -178,7 +177,7 @@ export const useActivityLogger = () => {
       surface: fumigation.totalSurface,
       surfaceUnit: fumigation.surfaceUnit,
       applicator: fumigation.applicator,
-      applicationDate: fumigation.applicationDate,
+      applicationDate: formatSafeDate(fumigation.applicationDate),
       productsUsed: fumigation.selectedProducts?.length || 0,
       status: fumigation.status,
       ...additionalData
@@ -195,8 +194,8 @@ export const useActivityLogger = () => {
       estimatedYield: harvest.estimatedYield,
       actualYield: harvest.actualYield,
       yieldUnit: harvest.yieldUnit,
-      plannedDate: harvest.plannedDate,
-      harvestDate: harvest.harvestDate,
+      plannedDate: formatSafeDate(harvest.plannedDate),
+      harvestDate: formatSafeDate(harvest.harvestDate),
       status: harvest.status,
       harvestMethod: harvest.harvestMethod,
       ...additionalData
@@ -210,7 +209,7 @@ export const useActivityLogger = () => {
       totalAmount: purchase.totalAmount,
       productsCount: purchase.products?.length || 0,
       status: purchase.status,
-      purchaseDate: purchase.purchaseDate,
+      purchaseDate: formatSafeDate(purchase.purchaseDate),
       createdBy: purchase.createdBy,
       deliveriesCount: purchase.deliveries?.length || 0,
       ...additionalData
@@ -226,7 +225,7 @@ export const useActivityLogger = () => {
       productName: expense.productName,
       quantitySold: expense.quantitySold,
       supplier: expense.supplier,
-      date: expense.date,
+      date: formatSafeDate(expense.date),
       ...additionalData
     });
   }, [log]);
@@ -263,7 +262,7 @@ export const useActivityLogger = () => {
       username: user.username,
       email: user.email,
       role: user.role,
-      permissions: Object.keys(user.permissions || {}),
+      permissions: user.permissions ? Object.keys(user.permissions) : [],
       displayName: user.displayName,
       ...additionalData
     });
@@ -342,18 +341,58 @@ export const useActivityLogger = () => {
 };
 
 // Funciones auxiliares
+
+// CORREGIDO: Obtener ID de entidad de manera más robusta
+function getEntityId(entityData) {
+  return entityData?.id || 
+         entityData?._id || 
+         entityData?.uid ||
+         entityData?.transferNumber ||
+         entityData?.orderNumber ||
+         entityData?.expenseNumber ||
+         entityData?.purchaseNumber ||
+         `temp-${Date.now()}`;
+}
+
 function getEntityName(entityData) {
-  return entityData.name || 
-         entityData.transferNumber || 
-         entityData.orderNumber || 
-         entityData.expenseNumber || 
-         entityData.purchaseNumber ||
-         entityData.username ||
-         entityData.displayName ||
-         entityData.title ||
-         entityData.description ||
-         `${entityData.id || 'Sin ID'}`.substring(0, 20) ||
+  return entityData?.name || 
+         entityData?.transferNumber || 
+         entityData?.orderNumber || 
+         entityData?.expenseNumber || 
+         entityData?.purchaseNumber ||
+         entityData?.username ||
+         entityData?.displayName ||
+         entityData?.title ||
+         entityData?.description ||
+         `Elemento ${getEntityId(entityData).substring(0, 8)}` ||
          'Entidad sin nombre';
+}
+
+// CORREGIDO: Limpiar metadata para evitar valores undefined
+function cleanMetadata(metadata) {
+  const cleaned = {};
+  
+  for (const [key, value] of Object.entries(metadata)) {
+    if (value !== undefined && value !== null && value !== '') {
+      // Convertir fechas a strings para evitar problemas de serialización
+      if (value instanceof Date) {
+        cleaned[key] = value.toISOString();
+      } else if (typeof value === 'object' && value.seconds) {
+        // Timestamp de Firebase
+        cleaned[key] = new Date(value.seconds * 1000).toISOString();
+      } else if (typeof value === 'object' && !Array.isArray(value)) {
+        // Objetos anidados - recursivo pero limitado
+        const nestedCleaned = cleanMetadata(value);
+        if (Object.keys(nestedCleaned).length > 0) {
+          cleaned[key] = nestedCleaned;
+        }
+      } else {
+        cleaned[key] = value;
+      }
+    }
+  }
+  
+  return cleaned;
 }
 
 function sanitizeEntityData(entityData) {
@@ -369,16 +408,16 @@ function sanitizeEntityData(entityData) {
   
   // Limitar el tamaño del objeto para evitar problemas de almacenamiento
   const jsonString = JSON.stringify(sanitized);
-  if (jsonString.length > 5000) {
+  if (jsonString.length > 3000) {
     return {
-      id: sanitized.id,
+      id: getEntityId(sanitized),
       name: getEntityName(sanitized),
       type: sanitized.type || sanitized.category,
       note: 'Datos truncados por tamaño'
     };
   }
   
-  return sanitized;
+  return cleanMetadata(sanitized);
 }
 
 function calculateTransferValue(products = []) {
@@ -389,32 +428,32 @@ function calculateTransferValue(products = []) {
   }, 0);
 }
 
-// Función para formatear fechas de manera segura
+// CORREGIDO: Función para formatear fechas de manera completamente segura
 function formatSafeDate(dateInput) {
   try {
+    if (!dateInput) return null;
+    
     let date;
     
-    if (!dateInput) return 'Sin fecha';
-    
-    if (dateInput?.seconds) {
+    if (dateInput instanceof Date) {
+      date = dateInput;
+    } else if (dateInput?.seconds) {
       // Timestamp de Firebase
       date = new Date(dateInput.seconds * 1000);
-    } else if (dateInput?.toDate) {
+    } else if (dateInput?.toDate && typeof dateInput.toDate === 'function') {
       // Timestamp object con método toDate
       date = dateInput.toDate();
-    } else if (dateInput instanceof Date) {
-      date = dateInput;
     } else if (typeof dateInput === 'string') {
       date = new Date(dateInput);
     } else if (typeof dateInput === 'number') {
       date = new Date(dateInput);
     } else {
-      return 'Fecha inválida';
+      return null;
     }
     
     // Verificar si la fecha es válida
     if (isNaN(date.getTime())) {
-      return 'Fecha inválida';
+      return null;
     }
     
     return date.toLocaleDateString('es-ES', {
@@ -424,7 +463,7 @@ function formatSafeDate(dateInput) {
     });
   } catch (error) {
     console.warn('Error al formatear fecha:', error);
-    return 'Fecha inválida';
+    return null;
   }
 }
 
@@ -467,7 +506,6 @@ function generateProductDescription(actionType, product, data) {
     case 'create':
       return `Creó el producto "${name}" en la categoría ${data.category || 'sin categoría'} con stock inicial de ${data.initialStock || data.stock || 0} ${data.unit || 'unidades'}`;
     case 'update':
-      // Si hay cambios específicos, mostrarlos
       if (data.changes && data.changes.length > 0) {
         const changesList = data.changes.map(change => {
           switch (change.type) {
@@ -490,8 +528,6 @@ function generateProductDescription(actionType, product, data) {
     case 'stock-adjust':
       const movement = data.difference > 0 ? 'aumentó' : 'disminuyó';
       return `${movement.charAt(0).toUpperCase() + movement.slice(1)} el stock de "${name}" en ${Math.abs(data.difference || 0)} ${data.unit || 'unidades'}. ${data.reason ? `Razón: ${data.reason}` : ''}`;
-    case 'move':
-      return `Trasladó "${name}" ${data.fromWarehouse ? `desde ${data.fromWarehouse}` : ''} ${data.toWarehouse ? `hacia ${data.toWarehouse}` : ''}`;
     default:
       return `${actionType} producto "${name}"`;
   }
@@ -528,8 +564,6 @@ function generateFumigationDescription(actionType, fumigation, data) {
       return `Completó fumigación ${order} en ${data.surface || 0} ${data.surfaceUnit || 'ha'} aplicada por ${data.applicator || 'aplicador no especificado'}`;
     case 'cancel':
       return `Canceló fumigación ${order}${data.reason ? `. Motivo: ${data.reason}` : ''}`;
-    case 'schedule':
-      return `Reprogramó fumigación ${order}${data.newDate ? ` para ${formatSafeDate(data.newDate)}` : ' para nueva fecha'}`;
     default:
       return `${actionType} fumigación ${order}`;
   }
@@ -541,43 +575,38 @@ function generateHarvestDescription(actionType, harvest, data) {
   
   switch (actionType) {
     case 'create':
-      return `Programó cosecha de ${crop} en ${field} (${data.area || 0} ${data.areaUnit || 'ha'}) - Rendimiento estimado: ${data.estimatedYield || 0} ${data.yieldUnit || 'kg/ha'}`;
+      return `Programó cosecha de ${crop} en ${field} (${data.area || 0} ${data.areaUnit || 'ha'})`;
     case 'complete':
-      return `Completó cosecha de ${crop} en ${field} - Rendimiento real: ${data.actualYield || 0} ${data.yieldUnit || 'kg/ha'}`;
+      return `Completó cosecha de ${crop} en ${field} - Rendimiento: ${data.actualYield || 0} ${data.yieldUnit || 'kg/ha'}`;
     case 'cancel':
-      return `Canceló cosecha de ${crop} en ${field}${data.reason ? `. Motivo: ${data.reason}` : ''}`;
+      return `Canceló cosecha de ${crop} en ${field}`;
     default:
       return `${actionType} cosecha de ${crop}`;
   }
 }
 
 function generatePurchaseDescription(actionType, purchase, data) {
-  const number = data.purchaseNumber || purchase.purchaseNumber || purchase.id?.substring(0, 8) || 'S/N';
+  const number = data.purchaseNumber || purchase.purchaseNumber || 'S/N';
   
   switch (actionType) {
     case 'create':
-      return `Registró compra ${number} a ${data.supplier || 'proveedor'} por ${(data.totalAmount || 0).toLocaleString()} (${data.productsCount || 0} productos)`;
+      return `Registró compra ${number} a ${data.supplier || 'proveedor'} por $${(data.totalAmount || 0).toLocaleString()}`;
     case 'delivery-create':
       return `Creó entrega para compra ${number}`;
     case 'delivery-complete':
-      return `Completó entrega de compra ${number} - Productos añadidos al inventario`;
-    case 'delivery-cancel':
-      return `Canceló entrega de compra ${number}${data.reason ? `. Motivo: ${data.reason}` : ''}`;
+      return `Completó entrega de compra ${number}`;
     default:
       return `${actionType} compra ${number}`;
   }
 }
 
 function generateExpenseDescription(actionType, expense, data) {
-  const number = data.expenseNumber || expense.expenseNumber || expense.id?.substring(0, 8) || 'S/N';
+  const number = data.expenseNumber || expense.expenseNumber || 'S/N';
   
   switch (actionType) {
     case 'create':
       const type = data.type === 'product' ? 'venta' : 'gasto';
-      const description = data.type === 'product' 
-        ? `${data.productName} (${data.quantitySold || 0} unidades)`
-        : data.description || 'sin descripción';
-      return `Registró ${type} ${number}: ${description} por ${(data.amount || 0).toLocaleString()}`;
+      return `Registró ${type} ${number} por $${(data.amount || 0).toLocaleString()}`;
     default:
       return `${actionType} gasto ${number}`;
   }
@@ -588,13 +617,9 @@ function generateFieldDescription(actionType, field, data) {
   
   switch (actionType) {
     case 'create':
-      return `Creó campo "${name}" en ${data.location || 'ubicación no especificada'} (${data.area || 0} ${data.areaUnit || 'ha'})`;
+      return `Creó campo "${name}" (${data.area || 0} ${data.areaUnit || 'ha'})`;
     case 'lot-add':
-      return `Añadió lote "${data.lotName || 'sin nombre'}" al campo "${name}"`;
-    case 'lot-update':
-      return `Actualizó lote "${data.lotName || 'sin nombre'}" del campo "${name}"`;
-    case 'lot-delete':
-      return `Eliminó lote "${data.lotName || 'sin nombre'}" del campo "${name}"`;
+      return `Añadió lote al campo "${name}"`;
     default:
       return `${actionType} campo "${name}"`;
   }
@@ -605,11 +630,11 @@ function generateWarehouseDescription(actionType, warehouse, data) {
   
   switch (actionType) {
     case 'create':
-      return `Creó ${data.type || 'almacén'} "${name}" en ${data.location || 'ubicación no especificada'} (capacidad: ${data.capacity || 0} ${data.capacityUnit || 'ton'})`;
+      return `Creó ${data.type || 'almacén'} "${name}"`;
     case 'activate':
       return `Activó almacén "${name}"`;
     case 'deactivate':
-      return `Desactivó almacén "${name}"${data.reason ? `. Motivo: ${data.reason}` : ''}`;
+      return `Desactivó almacén "${name}"`;
     default:
       return `${actionType} almacén "${name}"`;
   }
@@ -620,9 +645,7 @@ function generateUserDescription(actionType, user, data) {
   
   switch (actionType) {
     case 'create':
-      return `Creó usuario "${name}" con rol ${data.role || 'usuario'} y ${data.permissions?.length || 0} permisos`;
-    case 'permissions-update':
-      return `Actualizó permisos de usuario "${name}" - Nuevos permisos: ${data.permissions?.join(', ') || 'ninguno'}`;
+      return `Creó usuario "${name}" con rol ${data.role || 'usuario'}`;
     case 'login':
       return `Usuario "${name}" inició sesión`;
     case 'logout':
