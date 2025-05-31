@@ -1,4 +1,4 @@
-// src/hooks/useActivityLogger.js - Hook mejorado para rastreo automático de actividades
+// src/hooks/useActivityLogger.js - Hook mejorado con fechas corregidas y cambios detallados
 import { useCallback } from 'react';
 import { useActivities } from '../contexts/ActivityContext';
 
@@ -102,7 +102,7 @@ export const useActivityLogger = () => {
   // Función principal para registrar actividades
   const log = useCallback(async (action, entityData, additionalData = {}) => {
     try {
-      console.log('Registrando actividad:', action, entityData); // Debug
+      console.log('Registrando actividad:', action, entityData);
       
       // Extraer el tipo de entidad y acción del string de acción
       const [entity, actionType] = action.split('-');
@@ -130,10 +130,10 @@ export const useActivityLogger = () => {
         }
       };
 
-      console.log('Datos de actividad preparados:', activityData); // Debug
+      console.log('Datos de actividad preparados:', activityData);
       
       await logActivity(activityData);
-      console.log('Actividad registrada exitosamente'); // Debug
+      console.log('Actividad registrada exitosamente');
       
     } catch (error) {
       console.error('Error al registrar actividad:', error);
@@ -343,7 +343,6 @@ export const useActivityLogger = () => {
 
 // Funciones auxiliares
 function getEntityName(entityData) {
-  // Intentar obtener el nombre de la entidad de diferentes campos posibles
   return entityData.name || 
          entityData.transferNumber || 
          entityData.orderNumber || 
@@ -358,7 +357,6 @@ function getEntityName(entityData) {
 }
 
 function sanitizeEntityData(entityData) {
-  // Crear una copia limpia de los datos de la entidad sin campos sensibles
   const sensitiveFields = ['password', 'token', 'secret', 'key', 'credential'];
   const sanitized = { ...entityData };
   
@@ -389,6 +387,45 @@ function calculateTransferValue(products = []) {
     const cost = product.cost || product.unitCost || 0;
     return total + (quantity * cost);
   }, 0);
+}
+
+// Función para formatear fechas de manera segura
+function formatSafeDate(dateInput) {
+  try {
+    let date;
+    
+    if (!dateInput) return 'Sin fecha';
+    
+    if (dateInput?.seconds) {
+      // Timestamp de Firebase
+      date = new Date(dateInput.seconds * 1000);
+    } else if (dateInput?.toDate) {
+      // Timestamp object con método toDate
+      date = dateInput.toDate();
+    } else if (dateInput instanceof Date) {
+      date = dateInput;
+    } else if (typeof dateInput === 'string') {
+      date = new Date(dateInput);
+    } else if (typeof dateInput === 'number') {
+      date = new Date(dateInput);
+    } else {
+      return 'Fecha inválida';
+    }
+    
+    // Verificar si la fecha es válida
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.warn('Error al formatear fecha:', error);
+    return 'Fecha inválida';
+  }
 }
 
 function generateDescription(action, entityData, additionalData) {
@@ -428,14 +465,31 @@ function generateProductDescription(actionType, product, data) {
   
   switch (actionType) {
     case 'create':
-      return `Creó el producto "${name}" en la categoría ${data.category || 'sin categoría'} con stock inicial de ${data.stock || 0} ${data.unit || 'unidades'}`;
+      return `Creó el producto "${name}" en la categoría ${data.category || 'sin categoría'} con stock inicial de ${data.initialStock || data.stock || 0} ${data.unit || 'unidades'}`;
     case 'update':
+      // Si hay cambios específicos, mostrarlos
+      if (data.changes && data.changes.length > 0) {
+        const changesList = data.changes.map(change => {
+          switch (change.type) {
+            case 'increase':
+              return `${change.label}: ${change.oldValue} → ${change.newValue} ⬆️`;
+            case 'decrease':
+              return `${change.label}: ${change.oldValue} → ${change.newValue} ⬇️`;
+            case 'location':
+              return `${change.label}: ${change.oldValue} → ${change.newValue} 📍`;
+            default:
+              return `${change.label}: ${change.oldValue} → ${change.newValue}`;
+          }
+        }).join(', ');
+        
+        return `Actualizó "${name}" - Cambios: ${changesList}`;
+      }
       return `Actualizó el producto "${name}" - Stock actual: ${data.stock || 0} ${data.unit || 'unidades'}`;
     case 'delete':
-      return `Eliminó el producto "${name}" de la categoría ${data.category || 'sin categoría'}`;
+      return `Eliminó el producto "${name}" de la categoría ${data.category || 'sin categoría'}${data.finalStock ? ` (stock final: ${data.finalStock} ${data.unit || 'unidades'})` : ''}`;
     case 'stock-adjust':
       const movement = data.difference > 0 ? 'aumentó' : 'disminuyó';
-      return `${movement.charAt(0).toUpperCase() + movement.slice(1)} el stock de "${name}" en ${Math.abs(data.difference || 0)} ${data.unit || 'unidades'}. Razón: ${data.reason || 'no especificada'}`;
+      return `${movement.charAt(0).toUpperCase() + movement.slice(1)} el stock de "${name}" en ${Math.abs(data.difference || 0)} ${data.unit || 'unidades'}. ${data.reason ? `Razón: ${data.reason}` : ''}`;
     case 'move':
       return `Trasladó "${name}" ${data.fromWarehouse ? `desde ${data.fromWarehouse}` : ''} ${data.toWarehouse ? `hacia ${data.toWarehouse}` : ''}`;
     default:
@@ -452,13 +506,13 @@ function generateTransferDescription(actionType, transfer, data) {
     case 'approve':
       return `Aprobó la transferencia ${number}`;
     case 'reject':
-      return `Rechazó la transferencia ${number}. Motivo: ${data.reason || 'no especificado'}`;
+      return `Rechazó la transferencia ${number}${data.reason ? `. Motivo: ${data.reason}` : ''}`;
     case 'ship':
       return `Envió la transferencia ${number} desde ${data.sourceWarehouse || 'origen'}`;
     case 'receive':
       return `Recibió la transferencia ${number} en ${data.targetWarehouse || 'destino'}`;
     case 'cancel':
-      return `Canceló la transferencia ${number}. Motivo: ${data.reason || 'no especificado'}`;
+      return `Canceló la transferencia ${number}${data.reason ? `. Motivo: ${data.reason}` : ''}`;
     default:
       return `${actionType} transferencia ${number}`;
   }
@@ -473,9 +527,9 @@ function generateFumigationDescription(actionType, fumigation, data) {
     case 'complete':
       return `Completó fumigación ${order} en ${data.surface || 0} ${data.surfaceUnit || 'ha'} aplicada por ${data.applicator || 'aplicador no especificado'}`;
     case 'cancel':
-      return `Canceló fumigación ${order}. Motivo: ${data.reason || 'no especificado'}`;
+      return `Canceló fumigación ${order}${data.reason ? `. Motivo: ${data.reason}` : ''}`;
     case 'schedule':
-      return `Reprogramó fumigación ${order} para ${data.newDate ? new Date(data.newDate).toLocaleDateString() : 'nueva fecha'}`;
+      return `Reprogramó fumigación ${order}${data.newDate ? ` para ${formatSafeDate(data.newDate)}` : ' para nueva fecha'}`;
     default:
       return `${actionType} fumigación ${order}`;
   }
@@ -491,7 +545,7 @@ function generateHarvestDescription(actionType, harvest, data) {
     case 'complete':
       return `Completó cosecha de ${crop} en ${field} - Rendimiento real: ${data.actualYield || 0} ${data.yieldUnit || 'kg/ha'}`;
     case 'cancel':
-      return `Canceló cosecha de ${crop} en ${field}. Motivo: ${data.reason || 'no especificado'}`;
+      return `Canceló cosecha de ${crop} en ${field}${data.reason ? `. Motivo: ${data.reason}` : ''}`;
     default:
       return `${actionType} cosecha de ${crop}`;
   }
@@ -502,13 +556,13 @@ function generatePurchaseDescription(actionType, purchase, data) {
   
   switch (actionType) {
     case 'create':
-      return `Registró compra ${number} a ${data.supplier || 'proveedor'} por $${(data.totalAmount || 0).toLocaleString()} (${data.productsCount || 0} productos)`;
+      return `Registró compra ${number} a ${data.supplier || 'proveedor'} por ${(data.totalAmount || 0).toLocaleString()} (${data.productsCount || 0} productos)`;
     case 'delivery-create':
       return `Creó entrega para compra ${number}`;
     case 'delivery-complete':
       return `Completó entrega de compra ${number} - Productos añadidos al inventario`;
     case 'delivery-cancel':
-      return `Canceló entrega de compra ${number}. Motivo: ${data.reason || 'no especificado'}`;
+      return `Canceló entrega de compra ${number}${data.reason ? `. Motivo: ${data.reason}` : ''}`;
     default:
       return `${actionType} compra ${number}`;
   }
@@ -523,7 +577,7 @@ function generateExpenseDescription(actionType, expense, data) {
       const description = data.type === 'product' 
         ? `${data.productName} (${data.quantitySold || 0} unidades)`
         : data.description || 'sin descripción';
-      return `Registró ${type} ${number}: ${description} por $${(data.amount || 0).toLocaleString()}`;
+      return `Registró ${type} ${number}: ${description} por ${(data.amount || 0).toLocaleString()}`;
     default:
       return `${actionType} gasto ${number}`;
   }
@@ -555,7 +609,7 @@ function generateWarehouseDescription(actionType, warehouse, data) {
     case 'activate':
       return `Activó almacén "${name}"`;
     case 'deactivate':
-      return `Desactivó almacén "${name}". Motivo: ${data.reason || 'no especificado'}`;
+      return `Desactivó almacén "${name}"${data.reason ? `. Motivo: ${data.reason}` : ''}`;
     default:
       return `${actionType} almacén "${name}"`;
   }

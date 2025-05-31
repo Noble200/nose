@@ -1,7 +1,8 @@
-// src/controllers/ProductsController.js - Controlador corregido para la gestión de productos
+// src/controllers/ProductsController.js - Controlador mejorado con registro detallado de cambios
 import { useState, useEffect, useCallback } from 'react';
 import { useStock } from '../contexts/StockContext';
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { useActivityLogger } from '../hooks/useActivityLogger';
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '../api/firebase';
 
 const useProductsController = () => {
@@ -16,6 +17,8 @@ const useProductsController = () => {
     loadWarehouses
   } = useStock();
 
+  const { logProduct } = useActivityLogger(); // Usar el hook de actividades
+
   // Estados locales
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -24,54 +27,44 @@ const useProductsController = () => {
     category: 'all',
     stockStatus: 'all',
     fieldId: 'all',
-    expiringSoon: false, // NUEVO: filtro para productos próximos a vencer
+    expiringSoon: false,
     searchTerm: ''
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filteredProductsList, setFilteredProductsList] = useState([]);
 
-  // NUEVO: Effect para manejar filtros desde URL
+  // Effect para manejar filtros desde URL
   useEffect(() => {
-    // Leer parámetros de consulta de la URL
     const urlParams = new URLSearchParams(window.location.search);
     const filterParam = urlParams.get('filter');
     
     if (filterParam === 'stock-low') {
-      // Aplicar filtro de stock bajo
-      setFilters(prev => ({
-        ...prev,
-        stockStatus: 'low'
-      }));
+      setFilters(prev => ({ ...prev, stockStatus: 'low' }));
     } else if (filterParam === 'expiring-soon') {
-      // Aplicar filtro de productos próximos a vencer
-      setFilters(prev => ({
-        ...prev,
-        expiringSoon: true
-      }));
+      setFilters(prev => ({ ...prev, expiringSoon: true }));
     }
     
-    // Limpiar el parámetro de la URL después de aplicarlo
     if (filterParam) {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
   }, []);
 
-  // Función para añadir un producto
+  // Función para añadir un producto con logging
   const addProduct = useCallback(async (productData) => {
     try {
-      console.log('Datos recibidos para guardar:', productData); // Debug
+      console.log('Datos recibidos para guardar:', productData);
       
-      // Preparar datos para Firestore - CORREGIDO
+      // Preparar datos para Firestore
       const dbProductData = {
         name: productData.name,
         code: productData.code || null,
         category: productData.category,
         storageType: productData.storageType,
         unit: productData.unit,
-        stock: Number(productData.stock) || 0, // CORREGIDO: asegurar conversión a número
-        minStock: Number(productData.minStock) || 0, // CORREGIDO: asegurar conversión a número
+        stock: Number(productData.stock) || 0,
+        minStock: Number(productData.minStock) || 0,
         lotNumber: productData.lotNumber || null,
         storageConditions: productData.storageConditions || null,
         dimensions: productData.dimensions || null,
@@ -93,15 +86,29 @@ const useProductsController = () => {
       if (productData.expiryDate) {
         if (productData.expiryDate instanceof Date) {
           dbProductData.expiryDate = Timestamp.fromDate(productData.expiryDate);
+        } else if (typeof productData.expiryDate === 'string') {
+          dbProductData.expiryDate = Timestamp.fromDate(new Date(productData.expiryDate));
         }
       }
-      
-      console.log('Datos a guardar en Firestore:', dbProductData); // Debug
       
       // Insertar producto en Firestore
       const productRef = await addDoc(collection(db, 'products'), dbProductData);
       
-      console.log('Producto guardado con ID:', productRef.id); // Debug
+      // Registrar actividad
+      const warehouseName = warehouses.find(w => w.id === productData.warehouseId)?.name || null;
+      const fieldName = fields.find(f => f.id === productData.fieldId)?.name || null;
+      
+      await logProduct('create', {
+        id: productRef.id,
+        name: productData.name,
+        category: productData.category
+      }, {
+        initialStock: Number(productData.stock) || 0,
+        unit: productData.unit,
+        warehouse: warehouseName,
+        field: fieldName,
+        cost: productData.cost ? Number(productData.cost) : null
+      });
       
       // Recargar productos
       await loadProducts();
@@ -112,22 +119,30 @@ const useProductsController = () => {
       setError('Error al añadir producto: ' + error.message);
       throw error;
     }
-  }, [loadProducts]);
+  }, [loadProducts, logProduct, warehouses, fields]);
 
-  // Función para actualizar un producto
+  // Función para actualizar un producto con detección de cambios
   const updateProduct = useCallback(async (productId, productData) => {
     try {
-      console.log('Actualizando producto:', productId, productData); // Debug
+      console.log('Actualizando producto:', productId, productData);
       
-      // Preparar datos para actualizar - CORREGIDO
+      // Obtener los datos actuales del producto para comparar
+      const currentProductDoc = await getDoc(doc(db, 'products', productId));
+      const currentProduct = currentProductDoc.data();
+      
+      if (!currentProduct) {
+        throw new Error('Producto no encontrado');
+      }
+      
+      // Preparar datos para actualizar
       const updateData = {
         name: productData.name,
         code: productData.code || null,
         category: productData.category,
         storageType: productData.storageType,
         unit: productData.unit,
-        stock: Number(productData.stock) || 0, // CORREGIDO: asegurar conversión a número
-        minStock: Number(productData.minStock) || 0, // CORREGIDO: asegurar conversión a número
+        stock: Number(productData.stock) || 0,
+        minStock: Number(productData.minStock) || 0,
         lotNumber: productData.lotNumber || null,
         storageConditions: productData.storageConditions || null,
         dimensions: productData.dimensions || null,
@@ -148,13 +163,46 @@ const useProductsController = () => {
       if (productData.expiryDate) {
         if (productData.expiryDate instanceof Date) {
           updateData.expiryDate = Timestamp.fromDate(productData.expiryDate);
+        } else if (typeof productData.expiryDate === 'string') {
+          updateData.expiryDate = Timestamp.fromDate(new Date(productData.expiryDate));
         }
       }
       
-      console.log('Datos de actualización:', updateData); // Debug
-      
       // Actualizar producto en Firestore
       await updateDoc(doc(db, 'products', productId), updateData);
+      
+      // Detectar y registrar cambios específicos
+      const changes = detectProductChanges(currentProduct, updateData);
+      
+      if (changes.length > 0) {
+        // Preparar información adicional para el logging
+        const additionalData = {
+          changes: changes,
+          changesCount: changes.length,
+          changesSummary: generateChangesSummary(changes)
+        };
+        
+        // Agregar contexto de ubicación si cambió
+        if (changes.some(c => c.field === 'warehouseId' || c.field === 'fieldId')) {
+          const oldWarehouse = warehouses.find(w => w.id === currentProduct.warehouseId)?.name || 'Sin almacén';
+          const newWarehouse = warehouses.find(w => w.id === productData.warehouseId)?.name || 'Sin almacén';
+          const oldField = fields.find(f => f.id === currentProduct.fieldId)?.name || 'Sin campo';
+          const newField = fields.find(f => f.id === productData.fieldId)?.name || 'Sin campo';
+          
+          additionalData.locationChange = {
+            fromWarehouse: oldWarehouse,
+            toWarehouse: newWarehouse,
+            fromField: oldField,
+            toField: newField
+          };
+        }
+        
+        await logProduct('update', {
+          id: productId,
+          name: productData.name,
+          category: productData.category
+        }, additionalData);
+      }
       
       // Recargar productos
       await loadProducts();
@@ -165,13 +213,193 @@ const useProductsController = () => {
       setError('Error al actualizar producto: ' + error.message);
       throw error;
     }
-  }, [loadProducts]);
+  }, [loadProducts, logProduct, warehouses, fields]);
 
-  // Función para eliminar un producto
+  // Función para detectar cambios entre producto actual y nuevos datos
+  const detectProductChanges = (currentProduct, newData) => {
+    const changes = [];
+    
+    // Campos a monitorear con sus nombres legibles
+    const fieldsToMonitor = {
+      name: 'Nombre',
+      stock: 'Stock',
+      minStock: 'Stock mínimo',
+      cost: 'Costo',
+      category: 'Categoría',
+      unit: 'Unidad',
+      warehouseId: 'Almacén',
+      fieldId: 'Campo',
+      storageType: 'Tipo de almacenamiento',
+      supplierName: 'Proveedor',
+      notes: 'Notas'
+    };
+    
+    for (const [field, label] of Object.entries(fieldsToMonitor)) {
+      const oldValue = currentProduct[field];
+      const newValue = newData[field];
+      
+      // Comparar valores (considerar null y undefined como equivalentes)
+      if (oldValue !== newValue && !(oldValue == null && newValue == null)) {
+        changes.push({
+          field,
+          label,
+          oldValue: formatValue(oldValue, field),
+          newValue: formatValue(newValue, field),
+          type: getChangeType(field, oldValue, newValue)
+        });
+      }
+    }
+    
+    // Verificar cambio de fecha de vencimiento
+    if (currentProduct.expiryDate || newData.expiryDate) {
+      const oldDate = currentProduct.expiryDate 
+        ? formatFirebaseDate(currentProduct.expiryDate)
+        : null;
+      const newDate = newData.expiryDate 
+        ? formatFirebaseDate(newData.expiryDate)
+        : null;
+      
+      if (oldDate !== newDate) {
+        changes.push({
+          field: 'expiryDate',
+          label: 'Fecha de vencimiento',
+          oldValue: oldDate || 'Sin fecha',
+          newValue: newDate || 'Sin fecha',
+          type: 'date'
+        });
+      }
+    }
+    
+    return changes;
+  };
+
+  // Función para formatear valores según el tipo de campo
+  const formatValue = (value, field) => {
+    if (value == null) return 'Sin definir';
+    
+    switch (field) {
+      case 'stock':
+      case 'minStock':
+        return `${value} unidades`;
+      case 'cost':
+        return value ? `$${Number(value).toLocaleString()}` : '$0';
+      case 'warehouseId':
+        const warehouse = warehouses.find(w => w.id === value);
+        return warehouse ? warehouse.name : 'Almacén desconocido';
+      case 'fieldId':
+        const field_obj = fields.find(f => f.id === value);
+        return field_obj ? field_obj.name : 'Campo desconocido';
+      default:
+        return String(value);
+    }
+  };
+
+  // Función para formatear fechas de Firebase
+  const formatFirebaseDate = (timestamp) => {
+    try {
+      let date;
+      
+      if (timestamp?.seconds) {
+        // Timestamp de Firebase
+        date = new Date(timestamp.seconds * 1000);
+      } else if (timestamp?.toDate) {
+        // Timestamp object con método toDate
+        date = timestamp.toDate();
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else {
+        return null;
+      }
+      
+      // Verificar si la fecha es válida
+      if (isNaN(date.getTime())) {
+        return null;
+      }
+      
+      return date.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.warn('Error al formatear fecha:', error);
+      return null;
+    }
+  };
+
+  // Función para determinar el tipo de cambio
+  const getChangeType = (field, oldValue, newValue) => {
+    switch (field) {
+      case 'stock':
+        const oldStock = Number(oldValue) || 0;
+        const newStock = Number(newValue) || 0;
+        if (newStock > oldStock) return 'increase';
+        if (newStock < oldStock) return 'decrease';
+        return 'update';
+      case 'cost':
+        const oldCost = Number(oldValue) || 0;
+        const newCost = Number(newValue) || 0;
+        if (newCost > oldCost) return 'increase';
+        if (newCost < oldCost) return 'decrease';
+        return 'update';
+      case 'warehouseId':
+      case 'fieldId':
+        return 'location';
+      default:
+        return 'update';
+    }
+  };
+
+  // Función para generar resumen de cambios
+  const generateChangesSummary = (changes) => {
+    const summaryParts = [];
+    
+    changes.forEach(change => {
+      switch (change.type) {
+        case 'increase':
+          summaryParts.push(`${change.label}: ${change.oldValue} → ${change.newValue} (⬆️)`);
+          break;
+        case 'decrease':
+          summaryParts.push(`${change.label}: ${change.oldValue} → ${change.newValue} (⬇️)`);
+          break;
+        case 'location':
+          summaryParts.push(`${change.label}: ${change.oldValue} → ${change.newValue} (📍)`);
+          break;
+        default:
+          summaryParts.push(`${change.label}: ${change.oldValue} → ${change.newValue}`);
+      }
+    });
+    
+    return summaryParts.join(', ');
+  };
+
+  // Función para eliminar un producto con logging
   const deleteProduct = useCallback(async (productId) => {
     try {
-      // Eliminar el documento de la colección 'products'
-      await deleteDoc(doc(db, 'products', productId));
+      // Obtener datos del producto antes de eliminarlo
+      const productDoc = await getDoc(doc(db, 'products', productId));
+      const productData = productDoc.data();
+      
+      if (productData) {
+        // Eliminar el documento
+        await deleteDoc(doc(db, 'products', productId));
+        
+        // Registrar actividad
+        await logProduct('delete', {
+          id: productId,
+          name: productData.name,
+          category: productData.category
+        }, {
+          finalStock: productData.stock || 0,
+          unit: productData.unit,
+          warehouse: warehouses.find(w => w.id === productData.warehouseId)?.name,
+          field: fields.find(f => f.id === productData.fieldId)?.name
+        });
+      } else {
+        await deleteDoc(doc(db, 'products', productId));
+      }
       
       // Recargar productos
       await loadProducts();
@@ -182,24 +410,23 @@ const useProductsController = () => {
       setError('Error al eliminar producto: ' + error.message);
       throw error;
     }
-  }, [loadProducts]);
+  }, [loadProducts, logProduct, warehouses, fields]);
+
+  // ... resto del código del controlador permanece igual ...
 
   // Función para cargar datos
   const loadData = useCallback(async () => {
     try {
       setError('');
       
-      // Cargar campos si no están cargados
       if (fields.length === 0) {
         await loadFields();
       }
       
-      // Cargar almacenes si no están cargados
       if (warehouses.length === 0) {
         await loadWarehouses();
       }
       
-      // Cargar productos
       await loadProducts();
     } catch (err) {
       console.error('Error al cargar datos:', err);
@@ -231,7 +458,7 @@ const useProductsController = () => {
     return 'ok';
   };
 
-  // ACTUALIZADO: Filtrar productos según filtros aplicados incluyendo el nuevo filtro expiringSoon
+  // Filtrar productos según filtros aplicados
   const getFilteredProducts = useCallback(() => {
     if (!products || products.length === 0) return [];
     
@@ -249,7 +476,7 @@ const useProductsController = () => {
         }
       }
       
-      // NUEVO: Filtro por productos próximos a vencer (próximos 30 días)
+      // Filtro por productos próximos a vencer
       if (filters.expiringSoon) {
         const currentDate = new Date();
         const thirtyDaysFromNow = new Date();
@@ -312,25 +539,25 @@ const useProductsController = () => {
 
   // Confirmar eliminación de producto
   const handleDeleteProduct = useCallback(async (productId) => {
-    try {
-      await deleteProduct(productId);
-      
-      // Cerrar el diálogo si estaba abierto para este producto
-      if (selectedProduct && selectedProduct.id === productId) {
-        setDialogOpen(false);
+    if (window.confirm('¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.')) {
+      try {
+        await deleteProduct(productId);
+        
+        if (selectedProduct && selectedProduct.id === productId) {
+          setDialogOpen(false);
+        }
+      } catch (err) {
+        console.error('Error al eliminar producto:', err);
+        setError('Error al eliminar producto: ' + err.message);
       }
-    } catch (err) {
-      console.error('Error al eliminar producto:', err);
-      setError('Error al eliminar producto: ' + err.message);
     }
   }, [deleteProduct, selectedProduct]);
 
-  // Guardar producto (nuevo o editado) - CORREGIDO
+  // Guardar producto (nuevo o editado)
   const handleSaveProduct = useCallback(async (productData) => {
     try {
-      console.log('handleSaveProduct - Datos recibidos:', productData); // Debug
+      console.log('handleSaveProduct - Datos recibidos:', productData);
       
-      // Asegurar que los números se conviertan correctamente antes de enviar
       const processedData = {
         ...productData,
         stock: productData.stock ? Number(productData.stock) : 0,
@@ -338,14 +565,9 @@ const useProductsController = () => {
         cost: productData.cost ? Number(productData.cost) : null
       };
       
-      console.log('handleSaveProduct - Datos procesados:', processedData); // Debug
-      console.log('handleSaveProduct - Stock convertido:', processedData.stock, typeof processedData.stock); // Debug
-      
       if (dialogType === 'add-product') {
-        // Crear nuevo producto
         await addProduct(processedData);
       } else if (dialogType === 'edit-product' && selectedProduct) {
-        // Actualizar producto existente
         await updateProduct(selectedProduct.id, processedData);
       }
       
@@ -359,12 +581,11 @@ const useProductsController = () => {
     }
   }, [dialogType, selectedProduct, addProduct, updateProduct, loadProducts]);
 
-  // ACTUALIZADO: Cambiar filtros - incluyendo manejo del nuevo filtro
+  // Cambiar filtros
   const handleFilterChange = useCallback((filterName, value) => {
     setFilters(prev => {
       const newFilters = { ...prev, [filterName]: value };
       
-      // Si se selecciona un filtro específico, limpiar el filtro expiringSoon
       if (filterName === 'stockStatus' || filterName === 'category') {
         newFilters.expiringSoon = false;
       }
@@ -378,7 +599,7 @@ const useProductsController = () => {
     setFilters(prev => ({
       ...prev,
       searchTerm,
-      expiringSoon: false // Limpiar filtro especial al buscar
+      expiringSoon: false
     }));
   }, []);
 
@@ -388,7 +609,7 @@ const useProductsController = () => {
     setSelectedProduct(null);
   }, []);
 
-  // ACTUALIZADO: Opciones para filtros - agregando información sobre filtros especiales
+  // Opciones para filtros
   const filterOptions = {
     categories: [
       { value: 'all', label: 'Todas las categorías' },
@@ -410,7 +631,7 @@ const useProductsController = () => {
     ]
   };
 
-  // NUEVO: Función para limpiar filtros especiales
+  // Función para limpiar filtros especiales
   const clearSpecialFilters = useCallback(() => {
     setFilters(prev => ({
       ...prev,
@@ -429,7 +650,7 @@ const useProductsController = () => {
     dialogOpen,
     dialogType,
     filterOptions,
-    filters, // NUEVO: exponer filters para mostrar filtros activos
+    filters,
     handleAddProduct,
     handleEditProduct,
     handleViewProduct,
@@ -438,7 +659,7 @@ const useProductsController = () => {
     handleFilterChange,
     handleSearch,
     handleCloseDialog,
-    clearSpecialFilters, // NUEVO: función para limpiar filtros especiales
+    clearSpecialFilters,
     refreshData: loadData
   };
 };

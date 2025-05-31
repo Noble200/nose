@@ -1,4 +1,4 @@
-// src/contexts/ActivityContext.js - Contexto actualizado con paginación
+// src/contexts/ActivityContext.js - Contexto CORREGIDO con manejo de valores undefined
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   collection, 
@@ -21,6 +21,32 @@ export function useActivities() {
   return useContext(ActivityContext);
 }
 
+// NUEVA FUNCIÓN: Limpiar valores undefined de un objeto recursivamente
+const cleanUndefinedValues = (obj) => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(cleanUndefinedValues).filter(item => item !== undefined && item !== null);
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined && value !== null) {
+        const cleanedValue = cleanUndefinedValues(value);
+        if (cleanedValue !== undefined && cleanedValue !== null) {
+          cleaned[key] = cleanedValue;
+        }
+      }
+    }
+    return Object.keys(cleaned).length > 0 ? cleaned : null;
+  }
+  
+  return obj;
+};
+
 export function ActivityProvider({ children }) {
   const { currentUser } = useAuth();
   const [activities, setActivities] = useState([]);
@@ -33,6 +59,8 @@ export function ActivityProvider({ children }) {
     try {
       setLoading(true);
       setError('');
+      
+      console.log('🔍 ActivityContext.loadActivities - Cargando actividades...', { limitCount, reset });
       
       const activitiesQuery = query(
         collection(db, 'activities'), 
@@ -52,6 +80,8 @@ export function ActivityProvider({ children }) {
         });
       });
       
+      console.log('✅ ActivityContext.loadActivities - Actividades cargadas:', activitiesData.length);
+      
       if (reset) {
         setActivities(activitiesData);
       } else {
@@ -65,7 +95,7 @@ export function ActivityProvider({ children }) {
       
       return activitiesData;
     } catch (error) {
-      console.error('Error al cargar actividades:', error);
+      console.error('❌ ActivityContext.loadActivities - Error:', error);
       setError('Error al cargar actividades: ' + error.message);
       throw error;
     } finally {
@@ -118,39 +148,58 @@ export function ActivityProvider({ children }) {
     }
   }, [lastVisible]);
 
-  // Registrar una nueva actividad
+  // CORREGIDO: Registrar una nueva actividad con limpieza de valores undefined
   const logActivity = useCallback(async (activityData) => {
     try {
-      if (!currentUser) return;
+      if (!currentUser) {
+        console.warn('🔍 ActivityContext.logActivity - No hay usuario autenticado');
+        return;
+      }
 
-      const activity = {
-        type: activityData.type, // 'create', 'update', 'delete'
-        entity: activityData.entity, // 'product', 'transfer', 'fumigation', etc.
-        entityId: activityData.entityId,
+      console.log('🔍 ActivityContext.logActivity - Datos recibidos:', activityData);
+
+      // CORREGIDO: Limpiar valores undefined antes de enviar a Firestore
+      const cleanedActivityData = cleanUndefinedValues({
+        type: activityData.type || 'unknown',
+        entity: activityData.entity || 'unknown',
+        entityId: activityData.entityId || '',
         entityName: activityData.entityName || '',
-        action: activityData.action, // 'Creó producto', 'Completó transferencia', etc.
+        action: activityData.action || '',
         description: activityData.description || '',
-        metadata: activityData.metadata || {}, // Datos adicionales específicos
+        metadata: activityData.metadata || {},
         userId: currentUser.uid,
-        userName: currentUser.displayName || currentUser.email,
-        userEmail: currentUser.email,
+        userName: currentUser.displayName || currentUser.email || 'Usuario desconocido',
+        userEmail: currentUser.email || '',
         createdAt: serverTimestamp()
-      };
+      });
 
-      await addDoc(collection(db, 'activities'), activity);
+      console.log('🔍 ActivityContext.logActivity - Datos limpiados:', cleanedActivityData);
+
+      // Validar que los datos requeridos estén presentes
+      if (!cleanedActivityData.type || !cleanedActivityData.entity) {
+        console.error('❌ ActivityContext.logActivity - Datos insuficientes:', cleanedActivityData);
+        return;
+      }
+
+      // Insertar en Firestore
+      const docRef = await addDoc(collection(db, 'activities'), cleanedActivityData);
+      console.log('✅ ActivityContext.logActivity - Actividad guardada con ID:', docRef.id);
       
       // Actualizar las actividades locales agregando la nueva al principio
       const newActivity = {
-        id: Date.now().toString(), // ID temporal
-        ...activity,
+        id: docRef.id,
+        ...cleanedActivityData,
         createdAt: new Date()
       };
 
       setActivities(prev => [newActivity, ...prev]);
 
+      return docRef.id;
+
     } catch (error) {
-      console.error('Error al registrar actividad:', error);
+      console.error('❌ ActivityContext.logActivity - Error al registrar actividad:', error);
       // No lanzamos el error para que no interrumpa la operación principal
+      setError('Error al registrar actividad: ' + error.message);
     }
   }, [currentUser]);
 
@@ -244,7 +293,11 @@ export function ActivityProvider({ children }) {
   // Cargar actividades al inicializar
   useEffect(() => {
     if (currentUser) {
+      console.log('🔍 ActivityContext - Usuario detectado, cargando actividades...');
       loadActivities(50);
+    } else {
+      console.log('🔍 ActivityContext - No hay usuario, limpiando actividades...');
+      setActivities([]);
     }
   }, [currentUser, loadActivities]);
 
@@ -259,6 +312,13 @@ export function ActivityProvider({ children }) {
     loadActivitiesByUser,
     getRecentActivities
   };
+
+  console.log('🔍 ActivityContext - Valor del contexto:', {
+    activitiesCount: activities.length,
+    loading,
+    error,
+    logActivityExists: !!logActivity
+  });
 
   return (
     <ActivityContext.Provider value={value}>
