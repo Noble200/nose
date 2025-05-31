@@ -1,3 +1,4 @@
+// src/pages/Activities.js - Página de actividades actualizada
 import React from 'react';
 import ActivitiesPanel from '../components/panels/Activities/ActivitiesPanel';
 import useActivitiesController from '../controllers/ActivitiesController';
@@ -9,10 +10,13 @@ const Activities = () => {
     error,
     filters,
     filterOptions,
+    hasMore,
+    totalCount,
     handleFilterChange,
     handleSearch,
     handleRefresh,
-    clearFilters
+    handleLoadMore,
+    handleClearFilters
   } = useActivitiesController();
 
   return (
@@ -22,10 +26,13 @@ const Activities = () => {
       error={error}
       filters={filters}
       filterOptions={filterOptions}
+      hasMore={hasMore}
+      totalCount={totalCount}
       onFilterChange={handleFilterChange}
       onSearch={handleSearch}
       onRefresh={handleRefresh}
-      onClearFilters={clearFilters}
+      onLoadMore={handleLoadMore}
+      onClearFilters={handleClearFilters}
     />
   );
 };
