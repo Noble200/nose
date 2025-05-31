@@ -16,7 +16,8 @@ const routeTitles = {
   '/almacenes': 'Almacenes',
   '/usuarios': 'Usuarios',
   '/cosechas': 'Cosechas',
-  '/reportes': 'Reportes' // NUEVO
+  '/actividades': 'Historial de Actividades', // NUEVO
+  '/reportes': 'Reportes'
 };
 
 const AppLayout = () => {

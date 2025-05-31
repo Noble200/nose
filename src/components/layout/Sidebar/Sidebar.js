@@ -64,7 +64,13 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
       permission: 'warehouses'
     },
     { 
-      text: 'Reportes', // NUEVO
+      text: 'Actividades', // NUEVO
+      icon: 'fas fa-history', 
+      path: '/actividades',
+      permission: 'dashboard' // Usar permiso de dashboard por ahora
+    },
+    { 
+      text: 'Reportes',
       icon: 'fas fa-chart-bar', 
       path: '/reportes',
       permission: 'reports'
@@ -93,7 +99,7 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
     },
     {
       title: 'Administración',
-      options: [menuOptions[8], menuOptions[9], menuOptions[10]] // Almacenes, Reportes y Usuarios
+      options: [menuOptions[8], menuOptions[9], menuOptions[10], menuOptions[11]] // Almacenes, Actividades, Reportes y Usuarios
     }
   ];
 
