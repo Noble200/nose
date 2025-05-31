@@ -1,4 +1,4 @@
-// src/controllers/ReportsController.js - Controlador para gestión de reportes
+// src/controllers/ReportsController.js - Controlador para gestión de reportes - CORREGIDO
 import { useState, useEffect, useCallback } from 'react';
 import { useReports } from '../contexts/ReportsContext';
 import { useStock } from '../contexts/StockContext';
@@ -42,11 +42,15 @@ const useReportsController = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // CORREGIDO: Inicializar availableOptions con valores por defecto
   const [availableOptions, setAvailableOptions] = useState({
-    categories: [],
-    suppliers: [],
-    crops: [],
-    statuses: []
+    categories: [{ value: 'all', label: 'Todas las categorías' }],
+    suppliers: [{ value: 'all', label: 'Todos los proveedores' }],
+    crops: [{ value: 'all', label: 'Todos los cultivos' }],
+    statuses: [{ value: 'all', label: 'Todos los estados' }],
+    fields: [{ value: 'all', label: 'Todos los campos' }],
+    warehouses: [{ value: 'all', label: 'Todos los almacenes' }]
   });
 
   // Tipos de reportes disponibles
@@ -138,7 +142,7 @@ const useReportsController = () => {
     }));
   }, []);
 
-  // Obtener opciones disponibles para filtros según el tipo de reporte
+  // CORREGIDO: Obtener opciones disponibles para filtros según el tipo de reporte
   const getFilterOptions = useCallback(() => {
     const options = {
       categories: [
@@ -169,11 +173,11 @@ const useReportsController = () => {
       ],
       fields: [
         { value: 'all', label: 'Todos los campos' },
-        ...fields.map(field => ({ value: field.id, label: field.name }))
+        ...(Array.isArray(fields) ? fields.map(field => ({ value: field.id, label: field.name })) : [])
       ],
       warehouses: [
         { value: 'all', label: 'Todos los almacenes' },
-        ...warehouses.map(warehouse => ({ value: warehouse.id, label: warehouse.name }))
+        ...(Array.isArray(warehouses) ? warehouses.map(warehouse => ({ value: warehouse.id, label: warehouse.name })) : [])
       ]
     };
 
@@ -227,7 +231,8 @@ const useReportsController = () => {
 
   // Actualizar opciones disponibles cuando cambie el tipo de reporte
   useEffect(() => {
-    setAvailableOptions(getFilterOptions());
+    const newOptions = getFilterOptions();
+    setAvailableOptions(newOptions);
   }, [getFilterOptions]);
 
   // Cambiar tipo de reporte

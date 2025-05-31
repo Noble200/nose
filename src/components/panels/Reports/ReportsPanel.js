@@ -1,4 +1,4 @@
-// src/components/panels/Reports/ReportsPanel.js - Panel principal para gestión de reportes
+// src/components/panels/Reports/ReportsPanel.js - Panel corregido para gestión de reportes
 import React from 'react';
 import './reports.css';
 import ReportPreviewDialog from './ReportPreviewDialog';
@@ -32,9 +32,15 @@ const ReportsPanel = ({
   // Obtener filtros aplicables para el reporte actual
   const applicableFilters = getApplicableFilters();
   
-  // Función para renderizar filtros específicos
+  // CORREGIDO: Función para renderizar filtros específicos con validaciones
   const renderFilter = (filterKey) => {
     const baseClass = "form-control";
+    
+    // CORREGIDO: Validar que availableOptions exista y tenga las propiedades necesarias
+    if (!availableOptions) {
+      console.warn('availableOptions no está definido');
+      return null;
+    }
     
     switch (filterKey) {
       case 'startDate':
@@ -45,7 +51,7 @@ const ReportsPanel = ({
               type="date"
               id="startDate"
               className={baseClass}
-              value={filters.startDate}
+              value={filters.startDate || ''}
               onChange={(e) => onFilterChange('startDate', e.target.value)}
             />
           </div>
@@ -59,7 +65,7 @@ const ReportsPanel = ({
               type="date"
               id="endDate"
               className={baseClass}
-              value={filters.endDate}
+              value={filters.endDate || ''}
               onChange={(e) => onFilterChange('endDate', e.target.value)}
             />
           </div>
@@ -72,15 +78,19 @@ const ReportsPanel = ({
             <select
               id="status"
               className={baseClass}
-              value={filters.status}
+              value={filters.status || 'all'}
               onChange={(e) => onFilterChange('status', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {availableOptions.statuses.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {/* CORREGIDO: Validar que availableOptions.statuses existe y es un array */}
+              {availableOptions.statuses && Array.isArray(availableOptions.statuses) 
+                ? availableOptions.statuses.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                : <option value="all">Todos los estados</option>
+              }
             </select>
           </div>
         );
@@ -92,15 +102,19 @@ const ReportsPanel = ({
             <select
               id="category"
               className={baseClass}
-              value={filters.category}
+              value={filters.category || 'all'}
               onChange={(e) => onFilterChange('category', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {availableOptions.categories.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {/* CORREGIDO: Validar que availableOptions.categories existe y es un array */}
+              {availableOptions.categories && Array.isArray(availableOptions.categories)
+                ? availableOptions.categories.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                : <option value="all">Todas las categorías</option>
+              }
             </select>
           </div>
         );
@@ -112,15 +126,19 @@ const ReportsPanel = ({
             <select
               id="field"
               className={baseClass}
-              value={filters.field}
+              value={filters.field || 'all'}
               onChange={(e) => onFilterChange('field', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {availableOptions.fields.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {/* CORREGIDO: Validar que availableOptions.fields existe y es un array */}
+              {availableOptions.fields && Array.isArray(availableOptions.fields)
+                ? availableOptions.fields.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                : <option value="all">Todos los campos</option>
+              }
             </select>
           </div>
         );
@@ -132,15 +150,19 @@ const ReportsPanel = ({
             <select
               id="sourceWarehouse"
               className={baseClass}
-              value={filters.sourceWarehouse}
+              value={filters.sourceWarehouse || 'all'}
               onChange={(e) => onFilterChange('sourceWarehouse', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {availableOptions.warehouses.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {/* CORREGIDO: Validar que availableOptions.warehouses existe y es un array */}
+              {availableOptions.warehouses && Array.isArray(availableOptions.warehouses)
+                ? availableOptions.warehouses.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                : <option value="all">Todos los almacenes</option>
+              }
             </select>
           </div>
         );
@@ -152,15 +174,19 @@ const ReportsPanel = ({
             <select
               id="targetWarehouse"
               className={baseClass}
-              value={filters.targetWarehouse}
+              value={filters.targetWarehouse || 'all'}
               onChange={(e) => onFilterChange('targetWarehouse', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {availableOptions.warehouses.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {/* CORREGIDO: Validar que availableOptions.warehouses existe y es un array */}
+              {availableOptions.warehouses && Array.isArray(availableOptions.warehouses)
+                ? availableOptions.warehouses.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                : <option value="all">Todos los almacenes</option>
+              }
             </select>
           </div>
         );
@@ -172,15 +198,19 @@ const ReportsPanel = ({
             <select
               id="supplier"
               className={baseClass}
-              value={filters.supplier}
+              value={filters.supplier || 'all'}
               onChange={(e) => onFilterChange('supplier', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {availableOptions.suppliers.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {/* CORREGIDO: Validar que availableOptions.suppliers existe y es un array */}
+              {availableOptions.suppliers && Array.isArray(availableOptions.suppliers)
+                ? availableOptions.suppliers.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                : <option value="all">Todos los proveedores</option>
+              }
             </select>
           </div>
         );
@@ -192,15 +222,19 @@ const ReportsPanel = ({
             <select
               id="type"
               className={baseClass}
-              value={filters.type}
+              value={filters.type || 'all'}
               onChange={(e) => onFilterChange('type', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {availableOptions.statuses.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {/* CORREGIDO: Usar el array correcto para tipo (statuses) */}
+              {availableOptions.statuses && Array.isArray(availableOptions.statuses)
+                ? availableOptions.statuses.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                : <option value="all">Todos los tipos</option>
+              }
             </select>
           </div>
         );
@@ -212,15 +246,19 @@ const ReportsPanel = ({
             <select
               id="crop"
               className={baseClass}
-              value={filters.crop}
+              value={filters.crop || 'all'}
               onChange={(e) => onFilterChange('crop', e.target.value)}
               style={{ height: 'auto', minHeight: '40px', paddingTop: '8px', paddingBottom: '8px' }}
             >
-              {availableOptions.crops.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {/* CORREGIDO: Validar que availableOptions.crops existe y es un array */}
+              {availableOptions.crops && Array.isArray(availableOptions.crops)
+                ? availableOptions.crops.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                : <option value="all">Todos los cultivos</option>
+              }
             </select>
           </div>
         );
@@ -259,7 +297,7 @@ const ReportsPanel = ({
       <div className="report-types-section">
         <h2 className="section-title">Seleccionar tipo de reporte</h2>
         <div className="report-types-grid">
-          {reportTypes.map((reportType) => (
+          {reportTypes && Array.isArray(reportTypes) ? reportTypes.map((reportType) => (
             <div
               key={reportType.value}
               className={`report-type-card ${selectedReportType === reportType.value ? 'selected' : ''}`}
@@ -278,7 +316,11 @@ const ReportsPanel = ({
                 </div>
               )}
             </div>
-          ))}
+          )) : (
+            <div className="loading-container">
+              <p>Cargando tipos de reporte...</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -298,7 +340,7 @@ const ReportsPanel = ({
           </div>
 
           {/* Filtros */}
-          {applicableFilters.length > 0 && (
+          {applicableFilters && applicableFilters.length > 0 && (
             <div className="filters-section">
               <h3 className="filters-title">
                 <i className="fas fa-filter"></i> Filtros de búsqueda
