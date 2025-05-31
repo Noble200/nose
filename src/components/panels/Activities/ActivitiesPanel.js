@@ -1,4 +1,4 @@
-// src/components/panels/Activities/ActivitiesPanel.js - Panel de historial de actividades
+// src/components/panels/Activities/ActivitiesPanel.js - Panel de historial de actividades CORREGIDO
 import React, { useState } from 'react';
 import './activities.css';
 
@@ -18,37 +18,81 @@ const ActivitiesPanel = ({
 }) => {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
-  // Función para formatear fecha y hora relativa
+  // CORREGIDO: Función para formatear fecha y hora relativa
   const formatDateTime = (date) => {
-    const now = new Date();
-    const activityDate = new Date(date);
-    const diffTime = now - activityDate;
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-    const diffMinutes = Math.floor(diffTime / (1000 * 60));
+    try {
+      // Validar que date existe
+      if (!date) {
+        return { text: 'Fecha desconocida', class: '' };
+      }
 
-    if (diffMinutes < 5) {
-      return { text: 'Hace un momento', class: 'recent' };
-    } else if (diffMinutes < 60) {
-      return { text: `Hace ${diffMinutes} minutos`, class: 'recent' };
-    } else if (diffHours < 24) {
-      return { 
-        text: diffHours === 1 ? 'Hace 1 hora' : `Hace ${diffHours} horas`, 
-        class: 'today' 
-      };
-    } else if (diffDays === 1) {
-      return { text: 'Ayer', class: 'yesterday' };
-    } else if (diffDays < 7) {
-      return { text: `Hace ${diffDays} días`, class: '' };
-    } else {
-      return { 
-        text: activityDate.toLocaleDateString('es-ES', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        }), 
-        class: '' 
-      };
+      const now = new Date();
+      let activityDate;
+
+      // Convertir diferentes tipos de fecha a objeto Date
+      if (date instanceof Date) {
+        activityDate = date;
+      } else if (date?.seconds) {
+        // Timestamp de Firebase
+        activityDate = new Date(date.seconds * 1000);
+      } else if (date?.toDate && typeof date.toDate === 'function') {
+        // Timestamp object con método toDate
+        activityDate = date.toDate();
+      } else if (typeof date === 'string') {
+        activityDate = new Date(date);
+      } else if (typeof date === 'number') {
+        activityDate = new Date(date);
+      } else {
+        console.warn('Formato de fecha no reconocido:', date);
+        return { text: 'Fecha inválida', class: '' };
+      }
+
+      // Verificar que la fecha es válida
+      if (isNaN(activityDate.getTime())) {
+        console.warn('Fecha inválida detectada:', date);
+        return { text: 'Fecha inválida', class: '' };
+      }
+
+      // Calcular diferencias de tiempo
+      const diffTime = now.getTime() - activityDate.getTime();
+      const diffMinutes = Math.floor(diffTime / (1000 * 60));
+      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      // Manejar fechas futuras
+      if (diffTime < 0) {
+        return { text: 'Fecha futura', class: 'future' };
+      }
+
+      // Formatear según el tiempo transcurrido
+      if (diffMinutes < 1) {
+        return { text: 'Ahora mismo', class: 'recent' };
+      } else if (diffMinutes < 5) {
+        return { text: 'Hace un momento', class: 'recent' };
+      } else if (diffMinutes < 60) {
+        return { text: `Hace ${diffMinutes} minutos`, class: 'recent' };
+      } else if (diffHours < 24) {
+        return { 
+          text: diffHours === 1 ? 'Hace 1 hora' : `Hace ${diffHours} horas`, 
+          class: 'today' 
+        };
+      } else if (diffDays === 1) {
+        return { text: 'Ayer', class: 'yesterday' };
+      } else if (diffDays < 7) {
+        return { text: `Hace ${diffDays} días`, class: '' };
+      } else {
+        return { 
+          text: activityDate.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          }), 
+          class: '' 
+        };
+      }
+    } catch (error) {
+      console.error('Error al formatear fecha:', error, 'Fecha original:', date);
+      return { text: 'Error en fecha', class: '' };
     }
   };
 
