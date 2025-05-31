@@ -1,4 +1,4 @@
-// src/api/usersService.js
+// src/api/usersService.js - COMPLETO con permiso de actividades
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -20,6 +20,72 @@ import {
   where
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
+
+// Función para crear permisos por defecto con el nuevo permiso 'activities'
+const createDefaultPermissions = (role = 'user') => {
+  const basePermissions = {
+    dashboard: true, // Todos pueden ver el dashboard
+    activities: true // NUEVO: Todos pueden ver las actividades por defecto
+  };
+
+  switch (role) {
+    case 'admin':
+      return {
+        ...basePermissions,
+        admin: true,
+        products: true,
+        transfers: true,
+        purchases: true,
+        expenses: true,
+        fumigations: true,
+        harvests: true,
+        fields: true,
+        warehouses: true,
+        reports: true,
+        activities: true, // CONFIRMADO: Los admins pueden ver actividades
+        users: true
+      };
+    
+    case 'manager':
+      return {
+        ...basePermissions,
+        products: true,
+        transfers: true,
+        purchases: true,
+        expenses: true,
+        fumigations: true,
+        harvests: true,
+        fields: true,
+        warehouses: true,
+        reports: true,
+        activities: true // NUEVO: Los managers pueden ver actividades
+      };
+    
+    case 'operator':
+      return {
+        ...basePermissions,
+        products: true,
+        transfers: true,
+        fumigations: true,
+        harvests: true,
+        activities: true // NUEVO: Los operadores pueden ver actividades
+      };
+    
+    case 'viewer':
+      return {
+        ...basePermissions,
+        products: true,
+        activities: true // NUEVO: Los viewers pueden ver actividades (solo lectura)
+      };
+    
+    default: // 'user'
+      return {
+        ...basePermissions,
+        products: true,
+        activities: true // NUEVO: Los usuarios básicos pueden ver actividades
+      };
+  }
+};
 
 const usersService = {
   login: async (email, password) => {
@@ -43,7 +109,7 @@ const usersService = {
           username: user.email.split('@')[0],
           displayName: user.email.split('@')[0],
           role: 'user',
-          permissions: { dashboard: true }
+          permissions: createDefaultPermissions('user') // ACTUALIZADO: Usar función con nuevos permisos
         };
 
         await setDoc(doc(db, 'users', user.uid), basicUserData);
@@ -57,6 +123,18 @@ const usersService = {
       }
 
       const userData = userDoc.data();
+      
+      // ACTUALIZADO: Verificar y actualizar permisos si es necesario
+      let permissions = userData.permissions || createDefaultPermissions(userData.role || 'user');
+      
+      // Asegurar que el permiso 'activities' existe
+      if (!permissions.hasOwnProperty('activities')) {
+        permissions.activities = true; // Por defecto, todos pueden ver actividades
+        
+        // Actualizar en Firestore si es necesario
+        await updateDoc(doc(db, 'users', user.uid), { permissions });
+      }
+      
       return {
         uid: user.uid,
         email: user.email,
@@ -64,7 +142,7 @@ const usersService = {
         displayName: userData.displayName || user.email.split('@')[0],
         emailVerified: user.emailVerified,
         role: userData.role || 'user',
-        permissions: userData.permissions || { dashboard: true }
+        permissions: permissions
       };
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
@@ -101,6 +179,17 @@ const usersService = {
       
       console.log('Login exitoso con ID:', user.uid);
       
+      // ACTUALIZADO: Verificar y actualizar permisos si es necesario
+      let permissions = userData.permissions || createDefaultPermissions(userData.role || 'user');
+      
+      // Asegurar que el permiso 'activities' existe
+      if (!permissions.hasOwnProperty('activities')) {
+        permissions.activities = true;
+        
+        // Actualizar en Firestore
+        await updateDoc(doc(db, 'users', user.uid), { permissions });
+      }
+      
       return {
         uid: user.uid,
         email: userData.email,
@@ -108,7 +197,7 @@ const usersService = {
         displayName: userData.displayName || userData.username,
         emailVerified: user.emailVerified,
         role: userData.role || 'user',
-        permissions: userData.permissions || { dashboard: true }
+        permissions: permissions
       };
     } catch (error) {
       console.error('Error al iniciar sesión con nombre de usuario:', error);
@@ -174,16 +263,14 @@ const usersService = {
       // Datos a guardar en Firestore
       const { password, sendVerification, ...userDataForDB } = userData;
       
-      // Asegurarse de que tenga un rol y permisos
+      // ACTUALIZADO: Usar función de permisos por defecto actualizada
       const dataWithDefaults = {
         id: user.uid,
         email: user.email,
         username: userData.username || user.email.split('@')[0],
         displayName: userData.displayName || userData.username || user.email.split('@')[0],
         role: userData.role || 'user',
-        permissions: userData.permissions || {
-          dashboard: true
-        },
+        permissions: userData.permissions || createDefaultPermissions(userData.role || 'user'), // ACTUALIZADO
         createdAt: new Date()
       };
       
@@ -211,6 +298,11 @@ const usersService = {
         if (!querySnapshot.empty && querySnapshot.docs[0].id !== userId) {
           throw new Error('El nombre de usuario ya está en uso');
         }
+      }
+      
+      // ACTUALIZADO: Si se están actualizando permisos, asegurar que 'activities' esté incluido
+      if (updateData.permissions && !updateData.permissions.hasOwnProperty('activities')) {
+        updateData.permissions.activities = true; // Por defecto, mantener acceso a actividades
       }
       
       // Datos para actualizar en Firestore
@@ -317,8 +409,14 @@ const usersService = {
   
   updateUserPermissions: async (userId, permissions) => {
     try {
+      // ACTUALIZADO: Asegurar que el permiso 'activities' se mantenga a menos que se especifique lo contrario
+      const updatedPermissions = {
+        activities: true, // Por defecto mantener acceso
+        ...permissions // Los permisos específicos pueden sobrescribir el valor por defecto
+      };
+      
       await updateDoc(doc(db, 'users', userId), { 
-        permissions, 
+        permissions: updatedPermissions, 
         updatedAt: new Date() 
       });
       
@@ -347,6 +445,11 @@ const usersService = {
       // Los administradores tienen todos los permisos
       if (userData.role === 'admin' || userData.permissions?.admin) {
         return true;
+      }
+      
+      // ACTUALIZADO: Verificación específica para el permiso 'activities'
+      if (permission === 'activities') {
+        return userData.permissions?.activities === true;
       }
       
       // Verificar permiso específico

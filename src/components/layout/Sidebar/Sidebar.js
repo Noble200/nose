@@ -1,3 +1,4 @@
+// src/components/layout/Sidebar/Sidebar.js - ACTUALIZADO con permiso para actividades
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -7,7 +8,7 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
   const location = useLocation();
   const { currentUser, hasPermission } = useAuth();
   
-  // Opciones del menú principal con permisos requeridos
+  // Opciones del menú principal con permisos requeridos - ACTUALIZADO
   const menuOptions = [
     { 
       text: 'Panel Principal', 
@@ -64,10 +65,10 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
       permission: 'warehouses'
     },
     { 
-      text: 'Actividades', // NUEVO
+      text: 'Actividades', // ACTUALIZADO: Ahora con permiso específico
       icon: 'fas fa-history', 
       path: '/actividades',
-      permission: 'dashboard' // Usar permiso de dashboard por ahora
+      permission: 'activities' // NUEVO: Permiso específico para actividades
     },
     { 
       text: 'Reportes',
@@ -83,7 +84,7 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
     }
   ];
   
-  // Agrupar las opciones por categorías
+  // Agrupar las opciones por categorías - ACTUALIZADO
   const menuCategories = [
     {
       title: 'Principal',

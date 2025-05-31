@@ -1,4 +1,4 @@
-// src/components/panels/Activities/ActivitiesPanel.js - Panel CORREGIDO con manejo mejorado de fechas
+// src/components/panels/Activities/ActivitiesPanel.js - Panel con fecha y hora exacta
 import React, { useState } from 'react';
 import './activities.css';
 
@@ -18,21 +18,20 @@ const ActivitiesPanel = ({
 }) => {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
-  // CORREGIDO: Función mejorada para formatear fecha y hora relativa
+  // MODIFICADO: Función para formatear solo fecha y hora exacta
   const formatDateTime = (date) => {
     try {
       // Validar que date existe
       if (!date) {
         console.warn('Fecha no proporcionada');
-        return { text: 'Fecha desconocida', class: '' };
+        return 'Fecha desconocida';
       }
 
       console.log('Formateando fecha:', date, 'Tipo:', typeof date); // Debug
 
-      const now = new Date();
       let activityDate;
 
-      // CORREGIDO: Manejo más robusto de diferentes tipos de fecha
+      // Manejo robusto de diferentes tipos de fecha
       if (date instanceof Date) {
         // Ya es un objeto Date
         activityDate = date;
@@ -49,7 +48,7 @@ const ActivitiesPanel = ({
           activityDate = new Date(date.seconds * 1000 + date.nanoseconds / 1000000);
         } else {
           console.warn('Objeto de fecha no reconocido:', date);
-          return { text: 'Formato de fecha desconocido', class: '' };
+          return 'Formato de fecha desconocido';
         }
       } else if (typeof date === 'string') {
         // String de fecha
@@ -59,61 +58,30 @@ const ActivitiesPanel = ({
         activityDate = date > 1000000000000 ? new Date(date) : new Date(date * 1000);
       } else {
         console.warn('Tipo de fecha no reconocido:', typeof date, date);
-        return { text: 'Tipo de fecha no válido', class: '' };
+        return 'Tipo de fecha no válido';
       }
 
       // Verificar que la fecha es válida después de la conversión
       if (!activityDate || isNaN(activityDate.getTime())) {
         console.warn('Fecha inválida después de conversión:', activityDate);
-        return { text: 'Fecha inválida', class: '' };
+        return 'Fecha inválida';
       }
 
       console.log('Fecha convertida exitosamente:', activityDate); // Debug
 
-      // Calcular diferencias de tiempo
-      const diffTime = now.getTime() - activityDate.getTime();
-      const diffMinutes = Math.floor(diffTime / (1000 * 60));
-      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      // MODIFICADO: Retornar solo fecha y hora formateada
+      return activityDate.toLocaleString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false // Formato 24 horas
+      });
 
-      // Manejar fechas futuras
-      if (diffTime < 0) {
-        return { text: 'Fecha futura', class: 'future' };
-      }
-
-      // Formatear según el tiempo transcurrido
-      if (diffMinutes < 1) {
-        return { text: 'Ahora mismo', class: 'recent' };
-      } else if (diffMinutes < 5) {
-        return { text: 'Hace un momento', class: 'recent' };
-      } else if (diffMinutes < 60) {
-        return { text: `Hace ${diffMinutes} min`, class: 'recent' };
-      } else if (diffHours < 24) {
-        return { 
-          text: diffHours === 1 ? 'Hace 1 hora' : `Hace ${diffHours} horas`, 
-          class: 'today' 
-        };
-      } else if (diffDays === 1) {
-        return { text: 'Ayer', class: 'yesterday' };
-      } else if (diffDays < 7) {
-        return { text: `Hace ${diffDays} días`, class: '' };
-      } else if (diffDays < 30) {
-        const weeks = Math.floor(diffDays / 7);
-        return { text: weeks === 1 ? 'Hace 1 semana' : `Hace ${weeks} semanas`, class: '' };
-      } else {
-        // Para fechas muy antiguas, mostrar la fecha completa
-        return { 
-          text: activityDate.toLocaleDateString('es-ES', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          }), 
-          class: '' 
-        };
-      }
     } catch (error) {
       console.error('Error al formatear fecha:', error, 'Fecha original:', date);
-      return { text: 'Error en fecha', class: '' };
+      return 'Error en fecha';
     }
   };
 
@@ -318,7 +286,7 @@ const ActivitiesPanel = ({
           <>
             <div className="activities-timeline">
               {activities.map((activity, index) => {
-                const timeInfo = formatDateTime(activity.createdAt);
+                const formattedDateTime = formatDateTime(activity.createdAt);
                 
                 return (
                   <div key={activity.id || index} className="activity-item">
@@ -331,8 +299,9 @@ const ActivitiesPanel = ({
                         <span className="activity-action" title={activity.action}>
                           {truncateText(activity.action, 60)}
                         </span>
-                        <span className={`activity-time ${timeInfo.class}`} title={activity.createdAt ? new Date(activity.createdAt).toLocaleString('es-ES') : 'Fecha desconocida'}>
-                          {timeInfo.text}
+                        {/* MODIFICADO: Solo mostrar fecha y hora exacta sin clases de tiempo relativo */}
+                        <span className="activity-time" title={`Realizado el ${formattedDateTime}`}>
+                          {formattedDateTime}
                         </span>
                       </div>
                       
