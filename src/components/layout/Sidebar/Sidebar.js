@@ -34,7 +34,7 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
       permission: 'purchases'
     },
     { 
-      text: 'Gastos', // NUEVO
+      text: 'Gastos',
       icon: 'fas fa-receipt', 
       path: '/gastos',
       permission: 'expenses'
@@ -64,6 +64,12 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
       permission: 'warehouses'
     },
     { 
+      text: 'Reportes', // NUEVO
+      icon: 'fas fa-chart-bar', 
+      path: '/reportes',
+      permission: 'reports'
+    },
+    { 
       text: 'Usuarios', 
       icon: 'fas fa-users', 
       path: '/usuarios',
@@ -87,7 +93,7 @@ const Sidebar = ({ collapsed, toggleSidebar, mobileOpen }) => {
     },
     {
       title: 'Administración',
-      options: [menuOptions[8], menuOptions[9]] // Almacenes y Usuarios
+      options: [menuOptions[8], menuOptions[9], menuOptions[10]] // Almacenes, Reportes y Usuarios
     }
   ];
 

@@ -10,12 +10,13 @@ const routeTitles = {
   '/productos': 'Productos',
   '/transferencias': 'Transferencias',
   '/compras': 'Compras',
-  '/gastos': 'Gastos', // NUEVO
+  '/gastos': 'Gastos',
   '/fumigaciones': 'Fumigaciones',
   '/campos': 'Campos',
   '/almacenes': 'Almacenes',
   '/usuarios': 'Usuarios',
-  '/cosechas': 'Cosechas'
+  '/cosechas': 'Cosechas',
+  '/reportes': 'Reportes' // NUEVO
 };
 
 const AppLayout = () => {
